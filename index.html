@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Real 4D — Em Breve</title>
+  <meta name="description" content="Real 4D — Algo incrível está chegando. Em breve." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="noise"></div>
+
+  <main class="container">
+    <header class="logo-wrap">
+      <div class="logo">
+        <span class="logo-real">REAL</span><span class="logo-4d">4D</span>
+      </div>
+    </header>
+
+    <section class="hero">
+      <p class="badge">Em Construção</p>
+      <h1>Algo incrível<br />está chegando.</h1>
+      <p class="subtitle">
+        Estamos trabalhando duro para trazer uma experiência única.<br />
+        Fique de olho — em breve você vai entender o que é o Real 4D.
+      </p>
+    </section>
+
+    <footer class="footer">
+      <p>&copy; <span id="year"></span> Real 4D. Todos os direitos reservados.</p>
+    </footer>
+  </main>
+
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
