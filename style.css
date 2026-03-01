@@ -40,7 +40,7 @@ strong { font-weight: 600; }
 .narrow     { max-width: 720px; }
 .text-center{ text-align: center; }
 
-.section { padding-block: 6rem; }
+.section { padding-block: 6rem; scroll-margin-top: 80px; }
 
 .bg-dark    { background: var(--bg); }
 .bg-alt     { background: var(--bg-alt); }
