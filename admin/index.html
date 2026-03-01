@@ -31,9 +31,12 @@
     <!-- Lista de pedidos -->
     <div id="view-lista" style="display:none;">
       <div class="page-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
-        <div>
-          <h1>Pedidos</h1>
-          <p id="total-pedidos" style="color:var(--muted);font-size:0.9rem;"></p>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+          <div>
+            <h1>Pedidos</h1>
+            <p id="total-pedidos" style="color:var(--muted);font-size:0.9rem;"></p>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-novo-pedido">+ Novo pedido</button>
         </div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="filtros">
           <button class="btn btn-sm btn-secondary filtro-btn active" data-status="">Todos</button>
@@ -50,6 +53,7 @@
               <th>Cliente</th>
               <th>E-mail</th>
               <th>Status</th>
+              <th>Origem</th>
               <th>Data</th>
               <th></th>
             </tr>
@@ -73,11 +77,44 @@
 
   </main>
 
+  <!-- Modal: Novo Pedido -->
+  <div id="modal-novo-pedido" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;padding:1.5rem;">
+    <div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:var(--radius);padding:2rem;max-width:480px;width:100%;position:relative;">
+      <button id="modal-close" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--muted);font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+      <h2 style="margin-bottom:0.25rem;">Novo pedido manual</h2>
+      <p style="color:var(--muted);font-size:0.88rem;margin-bottom:1.5rem;">
+        Cria um pedido de teste. O cliente receberá um e-mail com link de acesso.
+      </p>
+      <form id="form-novo-pedido">
+        <div class="form-group">
+          <label class="form-label" for="novo-email">E-mail do cliente</label>
+          <input class="form-input" type="email" id="novo-email" required placeholder="cliente@exemplo.com" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="novo-nome">Nome do cliente</label>
+          <input class="form-input" type="text" id="novo-nome" required placeholder="Nome completo" autocomplete="off" />
+        </div>
+        <div id="novo-pedido-msg" style="margin-bottom:0.75rem;"></div>
+        <button type="submit" class="btn btn-primary btn-md btn-full" id="btn-criar-pedido">CRIAR PEDIDO</button>
+      </form>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
   <script>
     let todosPedidos = [];
     let filtroAtivo  = '';
+
+    function isManual(pedido) {
+      return pedido.hotmart_transaction?.startsWith('MANUAL-');
+    }
+
+    function origemBadge(pedido) {
+      return isManual(pedido)
+        ? '<span style="font-size:0.72rem;padding:2px 8px;border-radius:99px;background:rgba(168,85,247,0.15);color:#c084fc;">Manual</span>'
+        : '<span style="font-size:0.72rem;padding:2px 8px;border-radius:99px;background:rgba(234,179,8,0.12);color:#fde047;">Hotmart</span>';
+    }
 
     function show(id) {
       ['view-loading','view-lista','view-detalhe'].forEach(v => {
@@ -107,6 +144,7 @@
           <td><strong>${p.nome || '—'}</strong></td>
           <td style="color:var(--muted)">${p.email}</td>
           <td><span class="status-badge ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span></td>
+          <td>${origemBadge(p)}</td>
           <td style="color:var(--muted);font-size:0.82rem;">${formatDate(p.criado_em)}</td>
           <td style="text-align:right;"><button class="btn btn-sm btn-secondary">Ver →</button></td>
         `;
@@ -170,9 +208,10 @@
           <div>
             <h2>${pedido.nome || 'Cliente'}</h2>
             <p style="color:var(--muted);font-size:0.9rem;">${pedido.email}</p>
-            <p style="color:var(--muted);font-size:0.82rem;margin-top:0.25rem;">Compra: ${pedido.hotmart_transaction}</p>
-            <div style="margin-top:0.75rem;">
+            <p style="color:var(--muted);font-size:0.82rem;margin-top:0.25rem;">Transação: ${pedido.hotmart_transaction}</p>
+            <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
               <span class="status-badge ${STATUS_CLASS[pedido.status]}">${STATUS_LABEL[pedido.status]}</span>
+              ${origemBadge(pedido)}
             </div>
           </div>
           <div style="font-size:0.82rem;color:var(--muted);">
@@ -229,24 +268,11 @@
           ` : ''}
         </div>
 
-        <!-- Ações -->
-        ${pedido.status === 'prints_enviados' ? `
-          <div class="card" style="border-top:3px solid var(--primary);">
-            <h3>Concluir análise manualmente</h3>
-            <p style="color:var(--muted);font-size:.9rem;margin:.4rem 0 1rem;">
-              Use após enviar o PDF para marcar o pedido como concluído.
-            </p>
-            <button id="btn-concluir" class="btn btn-primary btn-md" data-pedido-id="${pedido.id}">
-              MARCAR COMO CONCLUÍDA
-            </button>
-          </div>
-        ` : ''}
       `;
 
       // Eventos do detalhe
       const pdfInput    = document.getElementById('pdf-input');
       const btnUpload   = document.getElementById('btn-upload-pdf');
-      const btnConcluir = document.getElementById('btn-concluir');
       const msgUpload   = document.getElementById('upload-pdf-msg');
 
       if (pdfInput) {
@@ -266,27 +292,19 @@
           try {
             const path = `${pedidoId}/relatorio.pdf`;
 
-            console.log('[admin] Step 1: uploading to storage...', path);
             const { error: errUp } = await db.storage
               .from('relatorios')
               .upload(path, file, { upsert: true, contentType: 'application/pdf' });
-            if (errUp) { console.error('[admin] Step 1 FAILED (storage upload):', errUp); throw errUp; }
-            console.log('[admin] Step 1 OK');
+            if (errUp) throw errUp;
 
-            // Salva na tabela relatorios (upsert)
-            console.log('[admin] Step 2: upsert relatorios table...');
             const { error: errRel } = await db.from('relatorios').upsert({
               pedido_id: pedidoId,
               storage_path: path,
             }, { onConflict: 'pedido_id' });
-            if (errRel) { console.error('[admin] Step 2 FAILED (relatorios upsert):', errRel); throw errRel; }
-            console.log('[admin] Step 2 OK');
+            if (errRel) throw errRel;
 
-            // Atualiza status
-            console.log('[admin] Step 3: updating pedido status...');
             const { error: errStatus } = await db.from('pedidos').update({ status: 'analise_concluida' }).eq('id', pedidoId);
-            if (errStatus) { console.error('[admin] Step 3 FAILED (pedido update):', errStatus); throw errStatus; }
-            console.log('[admin] Step 3 OK');
+            if (errStatus) throw errStatus;
 
             msgUpload.innerHTML = '<div class="alert alert-success">✅ Relatório enviado com sucesso! Status atualizado para "Análise concluída".</div>';
             btnUpload.textContent = 'ENVIAR RELATÓRIO';
@@ -303,24 +321,6 @@
         });
       }
 
-      if (btnConcluir) {
-        btnConcluir.addEventListener('click', async () => {
-          btnConcluir.disabled = true;
-          const { error } = await db
-            .from('pedidos')
-            .update({ status: 'analise_concluida' })
-            .eq('id', btnConcluir.dataset.pedidoId);
-
-          if (error) {
-            alert('Erro ao atualizar: ' + error.message);
-            btnConcluir.disabled = false;
-          } else {
-            btnConcluir.textContent = '✅ Concluída!';
-            const idx = todosPedidos.findIndex(p => p.id === btnConcluir.dataset.pedidoId);
-            if (idx >= 0) todosPedidos[idx].status = 'analise_concluida';
-          }
-        });
-      }
     }
 
     // Voltar
@@ -332,6 +332,68 @@
     document.getElementById('btn-logout').addEventListener('click', async () => {
       await db.auth.signOut();
       window.location.href = '/';
+    });
+
+    // ── Modal: Novo Pedido ──────────────────────────────────
+    const modal = document.getElementById('modal-novo-pedido');
+
+    function openModal() {
+      modal.style.display = 'flex';
+      document.getElementById('novo-email').value = '';
+      document.getElementById('novo-nome').value = '';
+      document.getElementById('novo-pedido-msg').innerHTML = '';
+      document.getElementById('btn-criar-pedido').disabled = false;
+      document.getElementById('btn-criar-pedido').textContent = 'CRIAR PEDIDO';
+    }
+
+    function closeModal() { modal.style.display = 'none'; }
+
+    document.getElementById('btn-novo-pedido').addEventListener('click', openModal);
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('form-novo-pedido').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('novo-email').value.trim().toLowerCase();
+      const nome  = document.getElementById('novo-nome').value.trim();
+      const msgEl = document.getElementById('novo-pedido-msg');
+      const btn   = document.getElementById('btn-criar-pedido');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Criando...';
+      msgEl.innerHTML = '';
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/hotmart-webhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'PURCHASE_APPROVED',
+            data: {
+              buyer: { email, name: nome },
+              purchase: { transaction: `MANUAL-${Date.now()}` }
+            }
+          }),
+        });
+
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+
+        msgEl.innerHTML = '<div class="alert alert-success">Pedido criado! Magic link enviado.</div>';
+
+        // Recarrega lista
+        const { data: pedidos } = await db.from('pedidos').select('*').order('criado_em', { ascending: false });
+        if (pedidos) {
+          todosPedidos = pedidos;
+          document.getElementById('total-pedidos').textContent = `${todosPedidos.length} pedido(s) no total`;
+          renderTabela(todosPedidos);
+        }
+
+        setTimeout(closeModal, 1500);
+      } catch (err) {
+        msgEl.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
+        btn.disabled = false;
+        btn.textContent = 'CRIAR PEDIDO';
+      }
     });
 
     // Init — uma única verificação, sem onAuthStateChange
