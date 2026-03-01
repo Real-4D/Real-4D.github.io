@@ -78,7 +78,6 @@
   <script>
     let todosPedidos = [];
     let filtroAtivo  = '';
-    let adminLoaded  = false;
 
     function show(id) {
       ['view-loading','view-lista','view-detalhe'].forEach(v => {
@@ -328,10 +327,18 @@
       window.location.href = '/';
     });
 
-    // Load
-    async function loadAdmin() {
-      if (adminLoaded) return;
-      adminLoaded = true;
+    // Init — uma única verificação, sem onAuthStateChange
+    async function init() {
+      const session = await getSession();
+
+      if (!session) {
+        window.location.href = '/entrar?next=admin';
+        return;
+      }
+      if (session.user.email !== ADMIN_EMAIL) {
+        window.location.href = '/';
+        return;
+      }
 
       const { data: pedidos, error } = await db
         .from('pedidos')
@@ -350,26 +357,7 @@
       show('view-lista');
     }
 
-    db.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-        if (session.user.email !== ADMIN_EMAIL) { window.location.href = '/'; return; }
-        await loadAdmin();
-      } else if (event === 'SIGNED_OUT') {
-        window.location.href = '/';
-      }
-    });
-
-    getSession().then(async session => {
-      if (session) {
-        if (session.user.email !== ADMIN_EMAIL) { window.location.href = '/'; return; }
-        await loadAdmin();
-      } else {
-        setTimeout(async () => {
-          const s = await getSession();
-          if (!s) window.location.href = '/entrar?next=admin';
-        }, 2000);
-      }
-    });
+    init();
   </script>
 </body>
 </html>
