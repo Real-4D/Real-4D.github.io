@@ -195,28 +195,37 @@ Deno.serve(async (req) => {
     }
 
     // Cria pedido no banco
-    const { error: errPedido } = await supabase.from("pedidos").insert({
+    const { data: pedidoCriado, error: errPedido } = await supabase.from("pedidos").insert({
       email,
       nome,
       hotmart_transaction: transacao,
       status: "aguardando_prints",
-    });
+    }).select("id").single();
 
     if (errPedido && !errPedido.message.includes("duplicate")) {
       console.error("Erro ao criar pedido:", errPedido);
       return new Response("Erro ao criar pedido", { status: 500, headers: corsHeaders });
     }
 
+    // Se duplicado, busca o id existente
+    let pedidoId = pedidoCriado?.id;
+    if (!pedidoId) {
+      const { data: existente } = await supabase.from("pedidos")
+        .select("id").eq("hotmart_transaction", transacao).single();
+      pedidoId = existente?.id;
+    }
+    const pedidoRef = pedidoId ? `#${pedidoId.substring(0, 8)}` : '';
+
     // Email A — Pedido confirmado + magic link
     try {
       const magicLink = await generateMagicLink(email, "/minha-analise");
       const html = emailLayout(
         "Pedido confirmado!",
-        "Seu pedido REAL 4D foi recebido com sucesso. Clique abaixo para enviar os prints da conversa e iniciar sua análise.",
+        `Seu pedido REAL 4D ${pedidoRef ? `<span style="font-family:monospace;opacity:0.7;">(${pedidoRef})</span> ` : ''}foi recebido com sucesso. Clique abaixo para enviar os prints da conversa e iniciar sua análise.`,
         "ENVIAR MEUS PRINTS",
         magicLink,
       );
-      await sendEmail(email, "Pedido confirmado — REAL 4D", html);
+      await sendEmail(email, `Pedido confirmado ${pedidoRef} — REAL 4D`, html);
     } catch (err) {
       console.error("Erro ao enviar email de confirmação:", err);
     }
@@ -238,15 +247,20 @@ Deno.serve(async (req) => {
 
   // ── Relatório pronto ──────────────────────────────────────
   if (evento === "REPORT_READY") {
+    // Busca pedido para obter id
+    const { data: pedidoReport } = await supabase.from("pedidos")
+      .select("id").eq("hotmart_transaction", transacao).single();
+    const reportRef = pedidoReport?.id ? `#${pedidoReport.id.substring(0, 8)}` : '';
+
     try {
       const magicLink = await generateMagicLink(email, "/minha-analise");
       const html = emailLayout(
         "Seu relatório está pronto!",
-        "A análise da sua conversa foi concluída. Clique abaixo para acessar e baixar o seu Raio-X REAL 4D em PDF.",
+        `A análise da sua conversa ${reportRef ? `<span style="font-family:monospace;opacity:0.7;">(${reportRef})</span> ` : ''}foi concluída. Clique abaixo para acessar e baixar o seu Raio-X REAL 4D em PDF.`,
         "VER MEU RELATÓRIO",
         magicLink,
       );
-      await sendEmail(email, "Seu relatório está pronto — REAL 4D", html);
+      await sendEmail(email, `Relatório pronto ${reportRef} — REAL 4D`, html);
     } catch (err) {
       console.error("Erro ao enviar email de relatório:", err);
       return new Response("Erro ao enviar email", { status: 500, headers: corsHeaders });
