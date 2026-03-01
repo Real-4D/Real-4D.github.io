@@ -266,20 +266,27 @@
           try {
             const path = `${pedidoId}/relatorio.pdf`;
 
+            console.log('[admin] Step 1: uploading to storage...', path);
             const { error: errUp } = await db.storage
               .from('relatorios')
               .upload(path, file, { upsert: true, contentType: 'application/pdf' });
-            if (errUp) throw errUp;
+            if (errUp) { console.error('[admin] Step 1 FAILED (storage upload):', errUp); throw errUp; }
+            console.log('[admin] Step 1 OK');
 
             // Salva na tabela relatorios (upsert)
+            console.log('[admin] Step 2: upsert relatorios table...');
             const { error: errRel } = await db.from('relatorios').upsert({
               pedido_id: pedidoId,
               storage_path: path,
             }, { onConflict: 'pedido_id' });
-            if (errRel) throw errRel;
+            if (errRel) { console.error('[admin] Step 2 FAILED (relatorios upsert):', errRel); throw errRel; }
+            console.log('[admin] Step 2 OK');
 
             // Atualiza status
-            await db.from('pedidos').update({ status: 'analise_concluida' }).eq('id', pedidoId);
+            console.log('[admin] Step 3: updating pedido status...');
+            const { error: errStatus } = await db.from('pedidos').update({ status: 'analise_concluida' }).eq('id', pedidoId);
+            if (errStatus) { console.error('[admin] Step 3 FAILED (pedido update):', errStatus); throw errStatus; }
+            console.log('[admin] Step 3 OK');
 
             msgUpload.innerHTML = '<div class="alert alert-success">✅ Relatório enviado com sucesso! Status atualizado para "Análise concluída".</div>';
             btnUpload.textContent = 'ENVIAR RELATÓRIO';

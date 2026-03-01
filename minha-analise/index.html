@@ -191,21 +191,25 @@
       document.getElementById('view-content').style.display  = 'block';
     }
 
-    // Auth — fonte única: onAuthStateChange
-    let pageLoaded = false;
-
-    db.auth.onAuthStateChange(async (event, session) => {
-      if (pageLoaded) return;
-
-      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
-        pageLoaded = true;
-        await loadPage(session);
-      } else if (event === 'INITIAL_SESSION' && !session) {
-        if (!window.location.hash.includes('access_token')) {
-          window.location.href = '/entrar';
-        }
+    // Auth — mesmo padrão do admin: getSession() direto
+    async function init() {
+      if (window.location.hash.includes('access_token')) {
+        await new Promise(resolve => {
+          db.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) resolve(session);
+            else if (event === 'INITIAL_SESSION') resolve(null);
+          });
+        });
       }
-    });
+
+      const session = await getSession();
+      if (!session) {
+        window.location.href = '/entrar';
+        return;
+      }
+      await loadPage(session);
+    }
+    init();
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
       await db.auth.signOut();

@@ -23,62 +23,43 @@
     <div id="view-form">
       <div class="page-title">
         <h1>Acesse sua análise</h1>
-        <p>Entre com o e-mail e senha da sua conta.</p>
+        <p>Insira o e-mail da compra e enviaremos um link de acesso.</p>
       </div>
 
       <div class="card">
+        <!-- Magic link (produção) -->
+        <form id="form-link">
+          <div class="form-group">
+            <label class="form-label" for="email">E-mail</label>
+            <input class="form-input" type="email" id="email" name="email"
+              placeholder="seuemail@exemplo.com" required autocomplete="email" />
+          </div>
+          <div id="error-msg" style="margin-bottom:0.75rem;"></div>
+          <button type="submit" class="btn btn-primary btn-lg btn-full" id="btn-submit">
+            ENVIAR LINK DE ACESSO
+          </button>
+        </form>
+        <p style="font-size:0.78rem;color:var(--muted);text-align:center;margin-top:1rem;">
+          Você receberá um link único no e-mail. Sem necessidade de senha.
+        </p>
 
-        <!-- Login com senha -->
-        <div id="section-password">
-          <form id="form-login">
+        <!-- Login com senha (só localhost — para dev/testes) -->
+        <div id="section-dev" style="display:none;">
+          <div class="divider" style="margin:1.25rem 0;"></div>
+          <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">Login com senha (dev only)</p>
+          <form id="form-password">
             <div class="form-group">
-              <label class="form-label" for="email">E-mail</label>
-              <input class="form-input" type="email" id="email" name="email"
-                placeholder="seuemail@exemplo.com" required autocomplete="email" />
+              <label class="form-label" for="email-pw">E-mail</label>
+              <input class="form-input" type="email" id="email-pw" placeholder="email" required autocomplete="email" />
             </div>
-            <div class="form-group" style="margin-bottom:0.5rem;">
+            <div class="form-group">
               <label class="form-label" for="senha">Senha</label>
-              <input class="form-input" type="password" id="senha" name="senha"
-                placeholder="••••••••" required autocomplete="current-password" />
+              <input class="form-input" type="password" id="senha" placeholder="senha" required autocomplete="current-password" />
             </div>
-            <div id="error-msg" style="margin-bottom:0.75rem;"></div>
-            <button type="submit" class="btn btn-primary btn-lg btn-full" id="btn-submit">
-              ENTRAR
-            </button>
+            <div id="error-pw" style="margin-bottom:0.75rem;"></div>
+            <button type="submit" class="btn btn-secondary btn-lg btn-full" id="btn-pw">ENTRAR COM SENHA</button>
           </form>
-
-          <div style="text-align:center;margin-top:1.25rem;">
-            <button id="btn-show-link"
-              style="background:none;border:none;color:var(--muted);font-size:0.82rem;cursor:pointer;font-family:inherit;text-decoration:underline;">
-              Não tenho senha — receber link de acesso por e-mail
-            </button>
-          </div>
         </div>
-
-        <!-- Fallback: magic link -->
-        <div id="section-link" style="display:none;">
-          <p style="font-size:0.88rem;color:var(--muted);margin-bottom:1.25rem;">
-            Insira seu e-mail e enviaremos um link de acesso único.
-          </p>
-          <form id="form-link">
-            <div class="form-group">
-              <label class="form-label" for="email-link">E-mail</label>
-              <input class="form-input" type="email" id="email-link" name="email"
-                placeholder="seuemail@exemplo.com" required autocomplete="email" />
-            </div>
-            <div id="error-msg-link" style="margin-bottom:0.75rem;"></div>
-            <button type="submit" class="btn btn-primary btn-lg btn-full" id="btn-link">
-              ENVIAR LINK DE ACESSO
-            </button>
-          </form>
-          <div style="text-align:center;margin-top:1.25rem;">
-            <button id="btn-show-password"
-              style="background:none;border:none;color:var(--muted);font-size:0.82rem;cursor:pointer;font-family:inherit;text-decoration:underline;">
-              ← Voltar para login com senha
-            </button>
-          </div>
-        </div>
-
       </div>
     </div>
 
@@ -89,6 +70,9 @@
         Verifique sua caixa de entrada e clique no link para acessar.<br />
         Não encontrou? Confira a pasta de spam.
       </p>
+      <button id="btn-reenviar" class="btn btn-secondary btn-md" style="margin-top:1.5rem;display:none;">
+        Enviar novamente
+      </button>
     </div>
 
   </main>
@@ -96,96 +80,36 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
   <script>
+    let redirected = false;
     function redirectLoggedIn(session) {
+      if (redirected) return;
+      redirected = true;
       window.location.href = session.user.email === ADMIN_EMAIL ? '/admin' : '/enviar';
     }
 
-    // Única fonte de verdade para auth
-    db.auth.onAuthStateChange((event, session) => {
-      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
-        redirectLoggedIn(session);
-      }
+    // Se já está logado, redireciona
+    getSession().then(session => {
+      if (session) redirectLoggedIn(session);
     });
 
-    // ── Rate limiting ──────────────────────────────────────────
-    let failedAttempts = 0;
-    let lockUntil = 0;
+    // ── Magic link ───────────────────────────────────────────
+    const form    = document.getElementById('form-link');
+    const btn     = document.getElementById('btn-submit');
+    const errEl   = document.getElementById('error-msg');
+    const params  = new URLSearchParams(window.location.search);
+    const next    = params.get('next') === 'admin' ? '/admin' : '/enviar';
 
-    function isLocked() {
-      return Date.now() < lockUntil;
-    }
+    let lastEmail = '';
 
-    function registerFailure(errEl) {
-      failedAttempts++;
-      if (failedAttempts >= 3) {
-        lockUntil = Date.now() + 30_000;
-        failedAttempts = 0;
-        errEl.innerHTML = '<div class="alert alert-warn">Muitas tentativas. Aguarde 30 segundos.</div>';
-      }
-    }
-
-    // ── Login com senha ────────────────────────────────────────
-    const formLogin = document.getElementById('form-login');
-    const btnSubmit = document.getElementById('btn-submit');
-    const errEl     = document.getElementById('error-msg');
-
-    formLogin.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errEl.innerHTML = '';
 
-      if (isLocked()) {
-        const secs = Math.ceil((lockUntil - Date.now()) / 1000);
-        errEl.innerHTML = `<div class="alert alert-warn">Bloqueado. Tente novamente em ${secs}s.</div>`;
-        return;
-      }
-
       const email = document.getElementById('email').value.trim();
-      const senha = document.getElementById('senha').value;
+      lastEmail = email;
 
-      btnSubmit.disabled = true;
-      btnSubmit.innerHTML = '<span class="spinner"></span>';
-
-      const { data, error } = await db.auth.signInWithPassword({ email, password: senha });
-
-      if (error) {
-        registerFailure(errEl);
-        if (!isLocked()) {
-          errEl.innerHTML = '<div class="alert alert-error">E-mail ou senha incorretos.</div>';
-        }
-        btnSubmit.disabled = false;
-        btnSubmit.textContent = 'ENTRAR';
-      } else {
-        // Redirect direto — sessão já está persistida quando a promise resolve
-        redirectLoggedIn(data.session);
-      }
-    });
-
-    // ── Alternar entre password e magic link ───────────────────
-    document.getElementById('btn-show-link').addEventListener('click', () => {
-      document.getElementById('section-password').style.display = 'none';
-      document.getElementById('section-link').style.display = 'block';
-    });
-
-    document.getElementById('btn-show-password').addEventListener('click', () => {
-      document.getElementById('section-link').style.display = 'none';
-      document.getElementById('section-password').style.display = 'block';
-    });
-
-    // ── Fallback: magic link ───────────────────────────────────
-    const formLink  = document.getElementById('form-link');
-    const btnLink   = document.getElementById('btn-link');
-    const errLinkEl = document.getElementById('error-msg-link');
-
-    const params = new URLSearchParams(window.location.search);
-    const next   = params.get('next') === 'admin' ? '/admin' : '/enviar';
-
-    formLink.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      errLinkEl.innerHTML = '';
-      const email = document.getElementById('email-link').value.trim();
-
-      btnLink.disabled = true;
-      btnLink.innerHTML = '<span class="spinner"></span>';
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
 
       const { error } = await db.auth.signInWithOtp({
         email,
@@ -193,12 +117,64 @@
       });
 
       if (error) {
-        errLinkEl.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
-        btnLink.disabled = false;
-        btnLink.textContent = 'ENVIAR LINK DE ACESSO';
+        errEl.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+        btn.disabled = false;
+        btn.textContent = 'ENVIAR LINK DE ACESSO';
       } else {
         document.getElementById('view-form').style.display    = 'none';
         document.getElementById('view-success').style.display = 'block';
+
+        // Mostra botão de reenviar após 30s
+        setTimeout(() => {
+          document.getElementById('btn-reenviar').style.display = 'inline-flex';
+        }, 30000);
+      }
+    });
+
+    // ── Dev: login com senha (só localhost) ────────────────
+    const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (isLocal) {
+      document.getElementById('section-dev').style.display = 'block';
+      document.getElementById('form-password').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email-pw').value.trim();
+        const senha = document.getElementById('senha').value;
+        const errPw = document.getElementById('error-pw');
+        const btnPw = document.getElementById('btn-pw');
+        errPw.innerHTML = '';
+        btnPw.disabled = true;
+        btnPw.innerHTML = '<span class="spinner"></span>';
+
+        const { data, error } = await db.auth.signInWithPassword({ email, password: senha });
+        if (error) {
+          errPw.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+          btnPw.disabled = false;
+          btnPw.textContent = 'ENTRAR COM SENHA';
+        } else {
+          redirectLoggedIn(data.session);
+        }
+      });
+    }
+
+    // ── Reenviar ─────────────────────────────────────────────
+    document.getElementById('btn-reenviar').addEventListener('click', async () => {
+      const btnReenviar = document.getElementById('btn-reenviar');
+      btnReenviar.disabled = true;
+      btnReenviar.textContent = 'Enviando...';
+
+      const { error } = await db.auth.signInWithOtp({
+        email: lastEmail,
+        options: { emailRedirectTo: `https://real4d.me${next}` }
+      });
+
+      if (error) {
+        btnReenviar.textContent = 'Erro — tente mais tarde';
+      } else {
+        btnReenviar.textContent = 'Link reenviado!';
+        setTimeout(() => {
+          btnReenviar.textContent = 'Enviar novamente';
+          btnReenviar.disabled = false;
+        }, 30000);
       }
     });
   </script>

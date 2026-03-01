@@ -221,22 +221,36 @@
       show('view-form');
     }
 
-    // Auth — fonte única: onAuthStateChange
-    let pageLoaded = false;
+    // Auth — mesmo padrão do admin: getSession() direto
+    async function init() {
+      console.log('[enviar] init() started');
 
-    db.auth.onAuthStateChange(async (event, session) => {
-      if (pageLoaded) return;
-
-      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
-        pageLoaded = true;
-        await loadPage(session);
-      } else if (event === 'INITIAL_SESSION' && !session) {
-        // Sem sessão. Se tem magic link na URL, SIGNED_IN vai disparar em seguida.
-        if (!window.location.hash.includes('access_token')) {
-          window.location.href = '/entrar';
-        }
+      // Se tem magic link na URL, espera Supabase processar o token
+      if (window.location.hash.includes('access_token')) {
+        console.log('[enviar] magic link detected, waiting...');
+        await new Promise(resolve => {
+          db.auth.onAuthStateChange((event, session) => {
+            console.log('[enviar] onAuthStateChange:', event, session?.user?.email);
+            if (event === 'SIGNED_IN' && session) resolve(session);
+            else if (event === 'INITIAL_SESSION') resolve(null);
+          });
+        });
       }
-    });
+
+      console.log('[enviar] calling getSession()...');
+      const session = await getSession();
+      console.log('[enviar] getSession() returned:', session ? session.user.email : 'null');
+
+      if (!session) {
+        console.log('[enviar] no session → redirecting to /entrar');
+        window.location.href = '/entrar';
+        return;
+      }
+
+      console.log('[enviar] session OK, calling loadPage()');
+      await loadPage(session);
+    }
+    init();
 
     // Logout
     document.getElementById('btn-logout').addEventListener('click', async () => {
