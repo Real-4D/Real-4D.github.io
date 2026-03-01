@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minha Análise — REAL 4D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+
+  <nav class="app-nav">
+    <a href="/" class="app-brand">
+      <img src="/assets/logo-without-name-back-black.png" alt="" />
+      <span>REAL<strong>4D</strong></span>
+    </a>
+    <div class="nav-right">
+      <span class="nav-email" id="nav-email"></span>
+      <button class="btn-logout" id="btn-logout">Sair</button>
+    </div>
+  </nav>
+
+  <main class="app-main">
+
+    <div id="view-loading" class="loading-screen">
+      <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>
+      <p>Carregando sua análise...</p>
+    </div>
+
+    <div id="view-content" style="display:none;">
+
+      <div class="page-title">
+        <h1>Minha análise</h1>
+      </div>
+
+      <!-- Tracker -->
+      <div class="tracker" id="tracker"></div>
+
+      <!-- Status card -->
+      <div class="card" id="status-card"></div>
+
+      <!-- Relatório disponível -->
+      <div id="relatorio-card" style="display:none;">
+        <div class="card" style="border-top:3px solid var(--primary);text-align:center;padding:2rem;">
+          <div style="font-size:2.5rem;margin-bottom:0.75rem;">📄</div>
+          <h2>Seu relatório está pronto!</h2>
+          <p style="color:var(--muted);margin:0.5rem 0 1.5rem;line-height:1.7;">
+            Clique abaixo para baixar o seu Raio-X REAL 4D em PDF.
+          </p>
+          <a id="btn-download" href="#" target="_blank" class="btn btn-primary btn-lg">
+            BAIXAR MEU RELATÓRIO (PDF)
+          </a>
+          <p style="font-size:0.78rem;color:var(--muted);margin-top:1rem;">
+            🔒 Link de download privado e exclusivo para você.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    function buildTracker(status) {
+      const steps = [
+        { label: 'Pagamento', states: ['aguardando_prints','prints_enviados','analise_concluida'] },
+        { label: 'Prints',    states: ['prints_enviados','analise_concluida'] },
+        { label: 'Análise',   states: ['analise_concluida'] },
+        { label: 'Relatório', states: ['analise_concluida'] },
+      ];
+
+      const tracker = document.getElementById('tracker');
+      tracker.innerHTML = '';
+
+      steps.forEach((step, i) => {
+        const isDone   = step.states.includes(status) && (i < steps.length - 1 || status === 'analise_concluida');
+        const isActive = !isDone && step.states.includes(status);
+
+        const div = document.createElement('div');
+        div.className = 'tracker-step';
+        div.innerHTML = `
+          <div class="tracker-dot ${isDone ? 'done' : isActive ? 'active' : ''}">
+            ${isDone ? '✓' : i + 1}
+          </div>
+          <div class="tracker-label ${isActive ? 'active' : ''}">${step.label}</div>
+        `;
+        tracker.appendChild(div);
+
+        if (i < steps.length - 1) {
+          const line = document.createElement('div');
+          line.className = `tracker-line ${isDone ? 'done' : ''}`;
+          tracker.appendChild(line);
+        }
+      });
+    }
+
+    function buildStatusCard(pedido) {
+      const card = document.getElementById('status-card');
+
+      const statusMessages = {
+        aguardando_prints: {
+          icon: '📱',
+          title: 'Aguardando seus prints',
+          desc: 'Você ainda não enviou os prints da conversa.',
+          cta: '<a href="/enviar" class="btn btn-primary btn-md" style="margin-top:1rem;">Enviar prints agora →</a>',
+        },
+        prints_enviados: {
+          icon: '⏳',
+          title: 'Análise em andamento',
+          desc: 'Recebemos seus prints. A análise será concluída em até 48 horas e você receberá o relatório por e-mail.',
+          cta: '',
+        },
+        analise_concluida: {
+          icon: '✅',
+          title: 'Análise concluída!',
+          desc: 'Seu relatório foi gerado. Baixe abaixo.',
+          cta: '',
+        },
+        reembolsado: {
+          icon: '↩️',
+          title: 'Pedido reembolsado',
+          desc: 'Este pedido foi reembolsado.',
+          cta: '<a href="/" class="btn btn-secondary btn-md" style="margin-top:1rem;">Voltar ao site</a>',
+        },
+      };
+
+      const msg = statusMessages[pedido.status] || statusMessages['aguardando_prints'];
+
+      card.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:1rem;">
+          <div style="font-size:2rem;flex-shrink:0;">${msg.icon}</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.4rem;flex-wrap:wrap;">
+              <h2 style="margin:0;">${msg.title}</h2>
+              <span class="status-badge ${STATUS_CLASS[pedido.status]}">${STATUS_LABEL[pedido.status]}</span>
+            </div>
+            <p style="color:var(--muted);font-size:0.95rem;line-height:1.7;">${msg.desc}</p>
+            ${msg.cta}
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="font-size:0.82rem;color:var(--muted);">
+          Pedido criado em ${formatDate(pedido.criado_em)}
+        </div>
+      `;
+    }
+
+    async function loadPage(session) {
+      document.getElementById('nav-email').textContent = session.user.email;
+
+      const { data: pedido, error } = await db
+        .from('pedidos')
+        .select('*')
+        .eq('email', session.user.email)
+        .order('criado_em', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !pedido) {
+        window.location.href = '/entrar'; return;
+      }
+
+      buildTracker(pedido.status);
+      buildStatusCard(pedido);
+
+      // Se análise concluída, busca relatório
+      if (pedido.status === 'analise_concluida') {
+        const { data: relatorio } = await db
+          .from('relatorios')
+          .select('storage_path')
+          .eq('pedido_id', pedido.id)
+          .single();
+
+        if (relatorio?.storage_path) {
+          const { data: signed } = await db.storage
+            .from('relatorios')
+            .createSignedUrl(relatorio.storage_path, 3600);
+
+          if (signed?.signedUrl) {
+            document.getElementById('btn-download').href = signed.signedUrl;
+            document.getElementById('relatorio-card').style.display = 'block';
+          }
+        }
+      }
+
+      document.getElementById('view-loading').style.display  = 'none';
+      document.getElementById('view-content').style.display  = 'block';
+    }
+
+    db.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        await loadPage(session);
+      }
+    });
+
+    getSession().then(async session => {
+      if (session) await loadPage(session);
+      else setTimeout(() => {
+        getSession().then(s => { if (!s) window.location.href = '/entrar'; });
+      }, 2000);
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await db.auth.signOut();
+      window.location.href = '/';
+    });
+  </script>
+</body>
+</html>

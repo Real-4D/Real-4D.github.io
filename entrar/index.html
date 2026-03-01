@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entrar — REAL 4D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+
+  <nav class="app-nav">
+    <a href="/" class="app-brand">
+      <img src="/assets/logo-without-name-back-black.png" alt="" />
+      <span>REAL<strong>4D</strong></span>
+    </a>
+  </nav>
+
+  <main class="app-main" style="display:flex;flex-direction:column;justify-content:center;max-width:480px;">
+
+    <div id="view-form">
+      <div class="page-title">
+        <h1>Acesse sua análise</h1>
+        <p>Insira o e-mail usado na compra. Vamos enviar um link de acesso.</p>
+      </div>
+
+      <div class="card">
+        <form id="form-login">
+          <div class="form-group">
+            <label class="form-label" for="email">Seu e-mail</label>
+            <input class="form-input" type="email" id="email" name="email"
+              placeholder="seuemail@exemplo.com" required autocomplete="email" />
+          </div>
+          <div id="error-msg"></div>
+          <button type="submit" class="btn btn-primary btn-lg btn-full" id="btn-submit">
+            ENVIAR LINK DE ACESSO
+          </button>
+        </form>
+      </div>
+
+      <p style="font-size:0.8rem;color:var(--muted);text-align:center;margin-top:1rem;">
+        O link expira em 1 hora e só pode ser usado uma vez.
+      </p>
+    </div>
+
+    <div id="view-success" style="display:none;text-align:center;">
+      <div style="font-size:3rem;margin-bottom:1rem;">📬</div>
+      <h2>Link enviado!</h2>
+      <p style="color:var(--muted);margin-top:0.5rem;line-height:1.7;">
+        Verifique sua caixa de entrada e clique no link para acessar.<br />
+        Não encontrou? Confira a pasta de spam.
+      </p>
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    // Se já está logado, redireciona
+    getSession().then(session => {
+      if (!session) return;
+      const isAdmin = session.user.email === ADMIN_EMAIL;
+      window.location.href = isAdmin ? '/admin' : '/enviar';
+    });
+
+    const form   = document.getElementById('form-login');
+    const btn    = document.getElementById('btn-submit');
+    const errEl  = document.getElementById('error-msg');
+
+    // Destino após o login
+    const params = new URLSearchParams(window.location.search);
+    const next   = params.get('next') === 'admin' ? '/admin' : '/enviar';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errEl.innerHTML = '';
+      const email = document.getElementById('email').value.trim();
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+
+      const { error } = await db.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `https://real4d.me${next}` }
+      });
+
+      if (error) {
+        errEl.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+        btn.disabled = false;
+        btn.textContent = 'ENVIAR LINK DE ACESSO';
+      } else {
+        document.getElementById('view-form').style.display    = 'none';
+        document.getElementById('view-success').style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

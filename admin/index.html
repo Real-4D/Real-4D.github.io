@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — REAL 4D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+
+  <nav class="app-nav">
+    <a href="/" class="app-brand">
+      <img src="/assets/logo-without-name-back-black.png" alt="" />
+      <span>REAL<strong>4D</strong> <span style="color:var(--muted);font-weight:400;font-size:0.75rem;margin-left:0.4rem;">admin</span></span>
+    </a>
+    <div class="nav-right">
+      <button class="btn-logout" id="btn-logout">Sair</button>
+    </div>
+  </nav>
+
+  <main class="app-main app-main-wide">
+
+    <div id="view-loading" class="loading-screen">
+      <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>
+      <p>Carregando painel...</p>
+    </div>
+
+    <!-- Lista de pedidos -->
+    <div id="view-lista" style="display:none;">
+      <div class="page-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div>
+          <h1>Pedidos</h1>
+          <p id="total-pedidos" style="color:var(--muted);font-size:0.9rem;"></p>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="filtros">
+          <button class="btn btn-sm btn-secondary filtro-btn active" data-status="">Todos</button>
+          <button class="btn btn-sm btn-secondary filtro-btn" data-status="aguardando_prints">Aguardando</button>
+          <button class="btn btn-sm btn-secondary filtro-btn" data-status="prints_enviados">Enviados</button>
+          <button class="btn btn-sm btn-secondary filtro-btn" data-status="analise_concluida">Concluídos</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table" id="tabela-pedidos">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>E-mail</th>
+              <th>Status</th>
+              <th>Data</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-pedidos"></tbody>
+        </table>
+        <div id="tabela-vazia" style="display:none;padding:2rem;text-align:center;color:var(--muted);font-size:0.9rem;">
+          Nenhum pedido encontrado.
+        </div>
+      </div>
+    </div>
+
+    <!-- Detalhe do pedido -->
+    <div id="view-detalhe" style="display:none;">
+      <div style="margin-bottom:1.5rem;">
+        <button class="btn btn-secondary btn-sm" id="btn-voltar">← Voltar</button>
+      </div>
+
+      <div id="detalhe-content"></div>
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    let todosPedidos = [];
+    let filtroAtivo  = '';
+
+    function show(id) {
+      ['view-loading','view-lista','view-detalhe'].forEach(v => {
+        document.getElementById(v).style.display = 'none';
+      });
+      document.getElementById(id).style.display = 'block';
+    }
+
+    function renderTabela(pedidos) {
+      const tbody = document.getElementById('tbody-pedidos');
+      const vazio = document.getElementById('tabela-vazia');
+      tbody.innerHTML = '';
+
+      const filtrados = filtroAtivo
+        ? pedidos.filter(p => p.status === filtroAtivo)
+        : pedidos;
+
+      if (filtrados.length === 0) {
+        vazio.style.display = 'block';
+        return;
+      }
+
+      vazio.style.display = 'none';
+      filtrados.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${p.nome || '—'}</strong></td>
+          <td style="color:var(--muted)">${p.email}</td>
+          <td><span class="status-badge ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span></td>
+          <td style="color:var(--muted);font-size:0.82rem;">${formatDate(p.criado_em)}</td>
+          <td style="text-align:right;"><button class="btn btn-sm btn-secondary">Ver →</button></td>
+        `;
+        tr.querySelector('button').addEventListener('click', () => abrirDetalhe(p));
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Filtros
+    document.querySelectorAll('.filtro-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filtroAtivo = btn.dataset.status;
+        renderTabela(todosPedidos);
+      });
+    });
+
+    // Detalhe
+    async function abrirDetalhe(pedido) {
+      show('view-detalhe');
+      const el = document.getElementById('detalhe-content');
+      el.innerHTML = `<div class="loading-screen" style="min-height:40vh;"><div class="spinner"></div></div>`;
+
+      // Busca dados relacionados
+      const [{ data: respostas }, { data: prints }, { data: relatorio }] = await Promise.all([
+        db.from('respostas').select('*').eq('pedido_id', pedido.id).single(),
+        db.from('prints').select('*').eq('pedido_id', pedido.id).order('criado_em'),
+        db.from('relatorios').select('*').eq('pedido_id', pedido.id).single(),
+      ]);
+
+      // Signed URLs para prints
+      let thumbsHtml = '<p style="color:var(--muted);font-size:0.9rem;">Nenhum print enviado ainda.</p>';
+      if (prints && prints.length > 0) {
+        const signedUrls = await Promise.all(
+          prints.map(p => db.storage.from('prints').createSignedUrl(p.storage_path, 3600))
+        );
+        const imgs = signedUrls
+          .filter(r => r.data?.signedUrl)
+          .map(r => `<img src="${r.data.signedUrl}" onclick="window.open(this.src,'_blank')" />`)
+          .join('');
+        thumbsHtml = `<div class="thumb-grid">${imgs}</div>`;
+      }
+
+      // Relatório
+      let relatorioHtml = '';
+      if (relatorio?.storage_path) {
+        const { data: signed } = await db.storage.from('relatorios').createSignedUrl(relatorio.storage_path, 3600);
+        if (signed?.signedUrl) {
+          relatorioHtml = `
+            <div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+              <span>✅ Relatório enviado</span>
+              <a href="${signed.signedUrl}" target="_blank" class="btn btn-sm btn-secondary">Baixar PDF</a>
+            </div>`;
+        }
+      }
+
+      el.innerHTML = `
+        <!-- Header -->
+        <div class="card" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h2>${pedido.nome || 'Cliente'}</h2>
+            <p style="color:var(--muted);font-size:0.9rem;">${pedido.email}</p>
+            <p style="color:var(--muted);font-size:0.82rem;margin-top:0.25rem;">Compra: ${pedido.hotmart_transaction}</p>
+            <div style="margin-top:0.75rem;">
+              <span class="status-badge ${STATUS_CLASS[pedido.status]}">${STATUS_LABEL[pedido.status]}</span>
+            </div>
+          </div>
+          <div style="font-size:0.82rem;color:var(--muted);">
+            ${formatDate(pedido.criado_em)}
+          </div>
+        </div>
+
+        <!-- Respostas -->
+        <div class="card">
+          <h3>Respostas do cliente</h3>
+          <div class="divider"></div>
+          ${respostas ? `
+            <div style="display:grid;gap:0.75rem;">
+              <div>
+                <p style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem;">Fase do relacionamento</p>
+                <p>${respostas.fase_relacionamento || '—'}</p>
+              </div>
+              <div>
+                <p style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem;">Principal preocupação</p>
+                <p>${respostas.preocupacao_principal || '—'}</p>
+              </div>
+              <div>
+                <p style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem;">Contexto adicional</p>
+                <p>${respostas.contexto_adicional || '—'}</p>
+              </div>
+            </div>
+          ` : '<p style="color:var(--muted);">Nenhuma resposta ainda.</p>'}
+        </div>
+
+        <!-- Prints -->
+        <div class="card">
+          <h3>Prints enviados ${prints ? `(${prints.length})` : ''}</h3>
+          <div class="divider"></div>
+          ${thumbsHtml}
+        </div>
+
+        <!-- Relatório -->
+        <div class="card">
+          <h3>Relatório</h3>
+          <div class="divider"></div>
+          ${relatorioHtml}
+          ${pedido.status !== 'reembolsado' ? `
+            <div style="margin-top:${relatorio ? '1rem' : '0'};">
+              <label class="form-label">Enviar PDF do relatório</label>
+              <input type="file" id="pdf-input" accept="application/pdf"
+                style="background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.12);
+                       border-radius:8px;padding:.75rem 1rem;width:100%;color:var(--muted);cursor:pointer;font-family:inherit;font-size:.88rem;" />
+              <div id="upload-pdf-msg" style="margin-top:.75rem;"></div>
+              <button id="btn-upload-pdf" class="btn btn-primary btn-md" style="margin-top:.75rem;" disabled
+                data-pedido-id="${pedido.id}" data-email="${pedido.email}">
+                ENVIAR RELATÓRIO
+              </button>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Ações -->
+        ${pedido.status === 'prints_enviados' ? `
+          <div class="card" style="border-top:3px solid var(--primary);">
+            <h3>Concluir análise manualmente</h3>
+            <p style="color:var(--muted);font-size:.9rem;margin:.4rem 0 1rem;">
+              Use após enviar o PDF para marcar o pedido como concluído.
+            </p>
+            <button id="btn-concluir" class="btn btn-primary btn-md" data-pedido-id="${pedido.id}">
+              MARCAR COMO CONCLUÍDA
+            </button>
+          </div>
+        ` : ''}
+      `;
+
+      // Eventos do detalhe
+      const pdfInput    = document.getElementById('pdf-input');
+      const btnUpload   = document.getElementById('btn-upload-pdf');
+      const btnConcluir = document.getElementById('btn-concluir');
+      const msgUpload   = document.getElementById('upload-pdf-msg');
+
+      if (pdfInput) {
+        pdfInput.addEventListener('change', () => {
+          btnUpload.disabled = !pdfInput.files[0];
+        });
+
+        btnUpload.addEventListener('click', async () => {
+          const file      = pdfInput.files[0];
+          const pedidoId  = btnUpload.dataset.pedidoId;
+          if (!file) return;
+
+          btnUpload.disabled = true;
+          btnUpload.innerHTML = '<span class="spinner"></span> Enviando...';
+          msgUpload.innerHTML = '';
+
+          try {
+            const path = `${pedidoId}/relatorio.pdf`;
+
+            const { error: errUp } = await db.storage
+              .from('relatorios')
+              .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+            if (errUp) throw errUp;
+
+            // Salva na tabela relatorios (upsert)
+            const { error: errRel } = await db.from('relatorios').upsert({
+              pedido_id: pedidoId,
+              storage_path: path,
+            }, { onConflict: 'pedido_id' });
+            if (errRel) throw errRel;
+
+            // Atualiza status
+            await db.from('pedidos').update({ status: 'analise_concluida' }).eq('id', pedidoId);
+
+            msgUpload.innerHTML = '<div class="alert alert-success">✅ Relatório enviado com sucesso! Status atualizado para "Análise concluída".</div>';
+            btnUpload.textContent = 'ENVIAR RELATÓRIO';
+
+            // Atualiza lista local
+            const idx = todosPedidos.findIndex(p => p.id === pedidoId);
+            if (idx >= 0) todosPedidos[idx].status = 'analise_concluida';
+
+          } catch (err) {
+            msgUpload.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
+            btnUpload.disabled = false;
+            btnUpload.textContent = 'ENVIAR RELATÓRIO';
+          }
+        });
+      }
+
+      if (btnConcluir) {
+        btnConcluir.addEventListener('click', async () => {
+          btnConcluir.disabled = true;
+          const { error } = await db
+            .from('pedidos')
+            .update({ status: 'analise_concluida' })
+            .eq('id', btnConcluir.dataset.pedidoId);
+
+          if (error) {
+            alert('Erro ao atualizar: ' + error.message);
+            btnConcluir.disabled = false;
+          } else {
+            btnConcluir.textContent = '✅ Concluída!';
+            const idx = todosPedidos.findIndex(p => p.id === btnConcluir.dataset.pedidoId);
+            if (idx >= 0) todosPedidos[idx].status = 'analise_concluida';
+          }
+        });
+      }
+    }
+
+    // Voltar
+    document.getElementById('btn-voltar').addEventListener('click', () => {
+      show('view-lista');
+    });
+
+    // Logout
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await db.auth.signOut();
+      window.location.href = '/';
+    });
+
+    // Load
+    async function loadAdmin() {
+      const session = await requireAdmin();
+      if (!session) return;
+
+      const { data: pedidos, error } = await db
+        .from('pedidos')
+        .select('*')
+        .order('criado_em', { ascending: false });
+
+      if (error) { console.error(error); return; }
+
+      todosPedidos = pedidos || [];
+      document.getElementById('total-pedidos').textContent = `${todosPedidos.length} pedido(s) no total`;
+      renderTabela(todosPedidos);
+      show('view-lista');
+    }
+
+    db.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        if (session.user.email !== ADMIN_EMAIL) {
+          window.location.href = '/'; return;
+        }
+        await loadAdmin();
+      }
+    });
+
+    getSession().then(async session => {
+      if (session) {
+        if (session.user.email !== ADMIN_EMAIL) { window.location.href = '/'; return; }
+        await loadAdmin();
+      } else {
+        setTimeout(() => {
+          getSession().then(s => { if (!s) window.location.href = '/entrar?next=admin'; });
+        }, 2000);
+      }
+    });
+  </script>
+</body>
+</html>

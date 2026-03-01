@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enviar prints — REAL 4D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+
+  <nav class="app-nav">
+    <a href="/" class="app-brand">
+      <img src="/assets/logo-without-name-back-black.png" alt="" />
+      <span>REAL<strong>4D</strong></span>
+    </a>
+    <div class="nav-right">
+      <span class="nav-email" id="nav-email"></span>
+      <button class="btn-logout" id="btn-logout">Sair</button>
+    </div>
+  </nav>
+
+  <main class="app-main">
+
+    <!-- Loading -->
+    <div id="view-loading" class="loading-screen">
+      <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>
+      <p>Carregando...</p>
+    </div>
+
+    <!-- Sem pedido encontrado -->
+    <div id="view-nopedido" style="display:none;">
+      <div class="alert alert-warn">
+        Nenhum pedido encontrado para esse e-mail. Verifique se utilizou o mesmo e-mail da compra.
+      </div>
+      <a href="/" class="btn btn-secondary btn-md">Voltar ao site</a>
+    </div>
+
+    <!-- Formulário de envio -->
+    <div id="view-form" style="display:none;">
+      <div class="page-title">
+        <h1>Envie sua conversa</h1>
+        <p>Responda 3 perguntas rápidas e envie até 10 prints.</p>
+      </div>
+
+      <!-- Tracker -->
+      <div class="tracker">
+        <div class="tracker-step">
+          <div class="tracker-dot done">✓</div>
+          <div class="tracker-label">Pagamento</div>
+        </div>
+        <div class="tracker-line done"></div>
+        <div class="tracker-step">
+          <div class="tracker-dot active">2</div>
+          <div class="tracker-label active">Prints</div>
+        </div>
+        <div class="tracker-line"></div>
+        <div class="tracker-step">
+          <div class="tracker-dot">3</div>
+          <div class="tracker-label">Análise</div>
+        </div>
+        <div class="tracker-line"></div>
+        <div class="tracker-step">
+          <div class="tracker-dot">4</div>
+          <div class="tracker-label">Relatório</div>
+        </div>
+      </div>
+
+      <form id="form-upload">
+        <!-- Pergunta 1 -->
+        <div class="card">
+          <h3>Sobre a conversa</h3>
+          <div class="divider"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="fase">Em que fase está a interação?</label>
+            <select class="form-select" id="fase" name="fase" required>
+              <option value="">Selecione...</option>
+              <option>Menos de 1 mês</option>
+              <option>1 a 3 meses</option>
+              <option>3 a 12 meses</option>
+              <option>Mais de 12 meses</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="preocupacao">Qual é sua principal preocupação?</label>
+            <select class="form-select" id="preocupacao" name="preocupacao" required>
+              <option value="">Selecione...</option>
+              <option>Saber se ele tem interesse real</option>
+              <option>Entender por que ele some e aparece</option>
+              <option>Descobrir se ele quer exclusividade</option>
+              <option>Entender se a relação vai evoluir</option>
+              <option>Outro</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="contexto">Contexto adicional (opcional)</label>
+            <textarea class="form-textarea" id="contexto" name="contexto"
+              placeholder="Algo importante que eu deva saber sobre a situação atual..."></textarea>
+          </div>
+        </div>
+
+        <!-- Upload -->
+        <div class="card">
+          <h3>Prints da conversa</h3>
+          <p style="font-size:0.85rem;color:var(--muted);margin-top:0.25rem;margin-bottom:1rem;">
+            Envie entre 1 e 10 prints em ordem cronológica. Você pode ocultar nomes e fotos.
+          </p>
+
+          <div class="upload-area" id="upload-area">
+            <input type="file" id="file-input" accept="image/*" multiple />
+            <div class="upload-icon">📱</div>
+            <p class="upload-text"><strong>Clique para selecionar</strong> ou arraste os prints aqui</p>
+            <p class="upload-text">Até 10 imagens · PNG, JPG, WEBP</p>
+          </div>
+
+          <div id="upload-count" class="upload-count" style="display:none;"></div>
+          <div id="preview-grid" class="preview-grid"></div>
+        </div>
+
+        <div id="submit-msg"></div>
+
+        <div id="progress-wrap" class="progress-wrap" style="display:none;">
+          <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg btn-full" id="btn-submit" disabled>
+          ENVIAR PARA ANÁLISE
+        </button>
+
+        <p style="font-size:0.78rem;color:var(--muted);text-align:center;margin-top:0.75rem;">
+          🔒 Análise confidencial. Seus prints não são compartilhados.
+        </p>
+      </form>
+    </div>
+
+    <!-- Prints enviados — aguardando análise -->
+    <div id="view-aguardando" style="display:none;text-align:center;">
+      <div class="tracker">
+        <div class="tracker-step">
+          <div class="tracker-dot done">✓</div>
+          <div class="tracker-label">Pagamento</div>
+        </div>
+        <div class="tracker-line done"></div>
+        <div class="tracker-step">
+          <div class="tracker-dot done">✓</div>
+          <div class="tracker-label">Prints</div>
+        </div>
+        <div class="tracker-line done"></div>
+        <div class="tracker-step">
+          <div class="tracker-dot active">3</div>
+          <div class="tracker-label active">Análise</div>
+        </div>
+        <div class="tracker-line"></div>
+        <div class="tracker-step">
+          <div class="tracker-dot">4</div>
+          <div class="tracker-label">Relatório</div>
+        </div>
+      </div>
+      <div style="font-size:2.5rem;margin-bottom:1rem;">⏳</div>
+      <h2>Prints recebidos!</h2>
+      <p style="color:var(--muted);margin-top:0.5rem;line-height:1.75;max-width:420px;margin-inline:auto;">
+        Sua análise está em andamento. Você receberá o relatório por e-mail em até 48 horas.
+      </p>
+      <a href="/minha-analise" class="btn btn-secondary btn-md" style="margin-top:1.5rem;">
+        Ver status da análise →
+      </a>
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script>
+    let currentSession = null;
+    let currentPedido  = null;
+    let selectedFiles  = [];
+
+    const MAX_FILES = 10;
+
+    function show(id) {
+      ['view-loading','view-nopedido','view-form','view-aguardando'].forEach(v => {
+        document.getElementById(v).style.display = 'none';
+      });
+      document.getElementById(id).style.display = 'block';
+    }
+
+    async function loadPage(session) {
+      currentSession = session;
+      document.getElementById('nav-email').textContent = session.user.email;
+
+      const { data: pedido, error } = await db
+        .from('pedidos')
+        .select('*')
+        .eq('email', session.user.email)
+        .order('criado_em', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !pedido) { show('view-nopedido'); return; }
+
+      currentPedido = pedido;
+
+      if (pedido.status === 'analise_concluida') {
+        window.location.href = '/minha-analise'; return;
+      }
+
+      if (pedido.status === 'prints_enviados') {
+        show('view-aguardando'); return;
+      }
+
+      show('view-form');
+    }
+
+    // Auth
+    db.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        await loadPage(session);
+      } else if (event === 'SIGNED_OUT') {
+        window.location.href = '/entrar';
+      }
+    });
+
+    getSession().then(async session => {
+      if (session) await loadPage(session);
+      else {
+        // Aguarda o onAuthStateChange capturar o magic link
+        setTimeout(() => {
+          getSession().then(s => {
+            if (!s) window.location.href = '/entrar';
+          });
+        }, 3000);
+      }
+    });
+
+    // Logout
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await db.auth.signOut();
+      window.location.href = '/';
+    });
+
+    // ── Upload ──────────────────────────────────────────────────
+    const uploadArea   = document.getElementById('upload-area');
+    const fileInput    = document.getElementById('file-input');
+    const previewGrid  = document.getElementById('preview-grid');
+    const uploadCount  = document.getElementById('upload-count');
+    const btnSubmit    = document.getElementById('btn-submit');
+
+    function updateUI() {
+      uploadCount.style.display = selectedFiles.length > 0 ? 'block' : 'none';
+      uploadCount.textContent   = `${selectedFiles.length} de ${MAX_FILES} imagens selecionadas`;
+      btnSubmit.disabled        = selectedFiles.length === 0;
+      renderPreviews();
+    }
+
+    function renderPreviews() {
+      previewGrid.innerHTML = '';
+      selectedFiles.forEach((file, i) => {
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+
+        const btn = document.createElement('button');
+        btn.className = 'preview-remove';
+        btn.type = 'button';
+        btn.innerHTML = '✕';
+        btn.onclick = () => {
+          selectedFiles.splice(i, 1);
+          updateUI();
+        };
+
+        item.appendChild(img);
+        item.appendChild(btn);
+        previewGrid.appendChild(item);
+      });
+    }
+
+    function handleFiles(files) {
+      const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+      const remaining = MAX_FILES - selectedFiles.length;
+      selectedFiles = [...selectedFiles, ...arr.slice(0, remaining)];
+      updateUI();
+    }
+
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('dragging'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragging'));
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragging');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    // ── Submit ──────────────────────────────────────────────────
+    document.getElementById('form-upload').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentPedido || selectedFiles.length === 0) return;
+
+      const fase       = document.getElementById('fase').value;
+      const preocupacao= document.getElementById('preocupacao').value;
+      const contexto   = document.getElementById('contexto').value;
+      const msgEl      = document.getElementById('submit-msg');
+      const progressWrap = document.getElementById('progress-wrap');
+      const progressBar  = document.getElementById('progress-bar');
+
+      if (!fase || !preocupacao) {
+        msgEl.innerHTML = '<div class="alert alert-warn">Responda as duas primeiras perguntas antes de enviar.</div>';
+        return;
+      }
+
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = '<span class="spinner"></span> Enviando...';
+      progressWrap.style.display = 'block';
+      msgEl.innerHTML = '';
+
+      try {
+        const userId   = currentSession.user.id;
+        const pedidoId = currentPedido.id;
+        const timestamp = Date.now();
+        const storagePaths = [];
+
+        // Upload cada print
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          const ext  = file.name.split('.').pop();
+          const path = `${userId}/${timestamp}-${i}.${ext}`;
+
+          const { error } = await db.storage.from('prints').upload(path, file, { upsert: true });
+          if (error) throw error;
+
+          storagePaths.push(path);
+          progressBar.style.width = `${Math.round(((i + 1) / selectedFiles.length) * 70)}%`;
+        }
+
+        // Salva paths na tabela prints
+        const printRows = storagePaths.map(p => ({ pedido_id: pedidoId, storage_path: p }));
+        const { error: errPrints } = await db.from('prints').insert(printRows);
+        if (errPrints) throw errPrints;
+
+        progressBar.style.width = '80%';
+
+        // Salva respostas
+        const { error: errResp } = await db.from('respostas').insert({
+          pedido_id: pedidoId,
+          fase_relacionamento: fase,
+          preocupacao_principal: preocupacao,
+          contexto_adicional: contexto || null,
+        });
+        if (errResp) throw errResp;
+
+        progressBar.style.width = '90%';
+
+        // Atualiza status do pedido
+        const { error: errPedido } = await db
+          .from('pedidos')
+          .update({ status: 'prints_enviados' })
+          .eq('id', pedidoId);
+        if (errPedido) throw errPedido;
+
+        progressBar.style.width = '100%';
+        setTimeout(() => show('view-aguardando'), 500);
+
+      } catch (err) {
+        console.error(err);
+        msgEl.innerHTML = `<div class="alert alert-error">Erro ao enviar: ${err.message}. Tente novamente.</div>`;
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'ENVIAR PARA ANÁLISE';
+        progressWrap.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
