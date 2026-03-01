@@ -262,7 +262,7 @@
                        border-radius:8px;padding:.75rem 1rem;width:100%;color:var(--muted);cursor:pointer;font-family:inherit;font-size:.88rem;" />
               <div id="upload-pdf-msg" style="margin-top:.75rem;"></div>
               <button id="btn-upload-pdf" class="btn btn-primary btn-md" style="margin-top:.75rem;" disabled
-                data-pedido-id="${pedido.id}" data-email="${pedido.email}">
+                data-pedido-id="${pedido.id}" data-email="${pedido.email}" data-transaction="${pedido.hotmart_transaction}">
                 ENVIAR RELATÓRIO
               </button>
             </div>
@@ -303,8 +303,10 @@
         });
 
         btnUpload.addEventListener('click', async () => {
-          const file      = pdfInput.files[0];
-          const pedidoId  = btnUpload.dataset.pedidoId;
+          const file        = pdfInput.files[0];
+          const pedidoId    = btnUpload.dataset.pedidoId;
+          const emailCliente = btnUpload.dataset.email;
+          const transaction = btnUpload.dataset.transaction;
           if (!file) return;
 
           btnUpload.disabled = true;
@@ -328,7 +330,24 @@
             const { error: errStatus } = await db.from('pedidos').update({ status: 'analise_concluida' }).eq('id', pedidoId);
             if (errStatus) throw errStatus;
 
-            msgUpload.innerHTML = '<div class="alert alert-success">✅ Relatório enviado com sucesso! Status atualizado para "Análise concluída".</div>';
+            // Notifica cliente via email (REPORT_READY)
+            try {
+              await fetch(`${SUPABASE_URL}/functions/v1/hotmart-webhook`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  event: 'REPORT_READY',
+                  data: {
+                    buyer: { email: emailCliente, name: '' },
+                    purchase: { transaction: transaction }
+                  }
+                }),
+              });
+            } catch (emailErr) {
+              console.error('Erro ao enviar email de relatório:', emailErr);
+            }
+
+            msgUpload.innerHTML = '<div class="alert alert-success">✅ Relatório enviado com sucesso! E-mail enviado ao cliente.</div>';
             btnUpload.textContent = 'ENVIAR RELATÓRIO';
 
             // Atualiza lista local
