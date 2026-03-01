@@ -130,6 +130,13 @@ Deno.serve(async (req) => {
 
     const pedidoIds = pedidos?.map((p) => p.id) || [];
 
+    // Log de exclusão (auditoria LGPD)
+    await supabase.from("exclusoes").insert({
+      email,
+      nome: nome || null,
+      pedidos_count: pedidoIds.length,
+    });
+
     if (pedidoIds.length > 0) {
       // 2. Busca prints para deletar do Storage
       const { data: prints } = await supabase

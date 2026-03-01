@@ -38,6 +38,7 @@
               <p id="total-pedidos" style="color:var(--muted);font-size:0.9rem;"></p>
             </div>
             <button class="btn btn-primary btn-sm" id="btn-novo-pedido">+ Novo pedido</button>
+            <button class="btn btn-secondary btn-sm" id="btn-ver-exclusoes" style="font-size:0.78rem;">Contas excluídas</button>
           </div>
         </div>
 
@@ -98,6 +99,33 @@
       <div id="detalhe-content"></div>
     </div>
 
+    <!-- Log de exclusões LGPD -->
+    <div id="view-exclusoes" style="display:none;">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" id="btn-voltar-exclusoes">← Voltar aos pedidos</button>
+        <div>
+          <h1 style="font-size:1.3rem;">Contas excluídas</h1>
+          <p id="total-exclusoes" style="color:var(--muted);font-size:0.85rem;"></p>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="data-table" id="tabela-exclusoes">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>E-mail</th>
+              <th>Pedidos</th>
+              <th>Data da exclusão</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-exclusoes"></tbody>
+        </table>
+        <div id="exclusoes-vazia" style="display:none;padding:2rem;text-align:center;color:var(--muted);font-size:0.9rem;">
+          Nenhuma exclusão registrada.
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- Modal: Novo Pedido -->
@@ -144,7 +172,7 @@
     }
 
     function show(id) {
-      ['view-loading','view-lista','view-detalhe'].forEach(v => {
+      ['view-loading','view-lista','view-detalhe','view-exclusoes'].forEach(v => {
         document.getElementById(v).style.display = 'none';
       });
       document.getElementById(id).style.display = 'block';
@@ -540,6 +568,46 @@
         btn.disabled = false;
         btn.textContent = 'CRIAR PEDIDO';
       }
+    });
+
+    // ── Exclusões LGPD ──────────────────────────────────────────
+    document.getElementById('btn-ver-exclusoes').addEventListener('click', async () => {
+      show('view-exclusoes');
+      const tbody = document.getElementById('tbody-exclusoes');
+      const vazio = document.getElementById('exclusoes-vazia');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:2rem;"><span class="spinner"></span></td></tr>';
+      vazio.style.display = 'none';
+
+      const { data: exclusoes } = await db
+        .from('exclusoes')
+        .select('*')
+        .order('criado_em', { ascending: false });
+
+      tbody.innerHTML = '';
+
+      if (!exclusoes || exclusoes.length === 0) {
+        vazio.style.display = 'block';
+        document.getElementById('total-exclusoes').textContent = '0 exclusões';
+        return;
+      }
+
+      document.getElementById('total-exclusoes').textContent = `${exclusoes.length} exclusão(ões)`;
+
+      exclusoes.forEach(ex => {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'default';
+        tr.innerHTML = `
+          <td>${ex.nome || '—'}</td>
+          <td style="color:var(--muted);">${ex.email}</td>
+          <td style="text-align:center;">${ex.pedidos_count}</td>
+          <td style="color:var(--muted);font-size:0.82rem;">${formatDate(ex.criado_em)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    });
+
+    document.getElementById('btn-voltar-exclusoes').addEventListener('click', () => {
+      show('view-lista');
     });
 
     // Init — uma única verificação, sem onAuthStateChange
