@@ -115,14 +115,33 @@
       el.innerHTML = `<div class="loading-screen" style="min-height:20vh;"><div class="spinner"></div></div>`;
       showView('view-detalhe');
 
-      // Busca datas de prints e relatório
+      // Busca prints e relatório
       const [{ data: prints }, { data: relatorio }] = await Promise.all([
-        db.from('prints').select('criado_em').eq('pedido_id', pedido.id).order('criado_em').limit(1),
+        db.from('prints').select('storage_path, criado_em').eq('pedido_id', pedido.id).order('criado_em'),
         db.from('relatorios').select('criado_em').eq('pedido_id', pedido.id).single(),
       ]);
 
       const printsDate = prints?.[0]?.criado_em || null;
       const relatorioDate = relatorio?.criado_em || null;
+
+      // Signed URLs para thumbnails
+      let printsHtml = '';
+      if (prints && prints.length > 0) {
+        const signedResults = await Promise.all(
+          prints.map(p => db.storage.from('prints').createSignedUrl(p.storage_path, 3600))
+        );
+        const imgs = signedResults
+          .filter(r => r.data?.signedUrl)
+          .map(r => `<img src="${r.data.signedUrl}" style="width:100%;border-radius:8px;cursor:pointer;display:block;" onclick="window.open(this.src,'_blank')" />`)
+          .join('');
+        printsHtml = `
+          <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border);">
+            <h3 style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.75rem;">Prints enviados (${prints.length})</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:0.5rem;">
+              ${imgs}
+            </div>
+          </div>`;
+      }
 
       let ctaHtml = '';
       if (pedido.status === 'aguardando_prints') {
@@ -212,6 +231,7 @@
             <h3 style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.75rem;">Histórico do pedido</h3>
             ${timelineHtml}
           </div>
+          ${printsHtml}
         </div>
       `;
     }
