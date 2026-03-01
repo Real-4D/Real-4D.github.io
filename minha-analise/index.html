@@ -55,12 +55,118 @@
 
     </div>
 
+    <!-- Detalhe do pedido -->
+    <div id="view-detalhe" style="display:none;">
+      <div style="margin-bottom:1.5rem;">
+        <button class="btn btn-secondary btn-sm" id="btn-voltar">← Voltar</button>
+      </div>
+      <div id="detalhe-content"></div>
+    </div>
+
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
   <script>
     const HOTMART_URL = 'https://pay.hotmart.com/W104658249V';
+
+    function showView(id) {
+      ['view-loading','view-content','view-detalhe'].forEach(v => {
+        document.getElementById(v).style.display = 'none';
+      });
+      document.getElementById(id).style.display = 'block';
+    }
+
+    function trackerStep(number, label, state) {
+      // state: 'done', 'active', ''
+      const dotClass = state === 'done' ? 'tracker-dot done' : state === 'active' ? 'tracker-dot active' : 'tracker-dot';
+      const labelClass = state === 'active' ? 'tracker-label active' : 'tracker-label';
+      const content = state === 'done' ? '✓' : number;
+      return `<div class="tracker-step"><div class="${dotClass}">${content}</div><div class="${labelClass}">${label}</div></div>`;
+    }
+
+    function trackerLine(done) {
+      return `<div class="tracker-line${done ? ' done' : ''}"></div>`;
+    }
+
+    function buildTracker(status) {
+      const steps = [
+        { n: 1, label: 'Pedido', doneAt: ['aguardando_prints','prints_enviados','analise_concluida','reembolsado'] },
+        { n: 2, label: 'Prints', doneAt: ['prints_enviados','analise_concluida'], activeAt: ['aguardando_prints'] },
+        { n: 3, label: 'Análise', doneAt: ['analise_concluida'], activeAt: ['prints_enviados'] },
+        { n: 4, label: 'Relatório', doneAt: [], activeAt: ['analise_concluida'] },
+      ];
+
+      let html = '';
+      steps.forEach((s, i) => {
+        const state = s.doneAt.includes(status) ? 'done' : (s.activeAt && s.activeAt.includes(status)) ? 'active' : '';
+        if (i > 0) {
+          const lineDone = steps[i].doneAt.includes(status) || (s.activeAt && s.activeAt.includes(status));
+          html += trackerLine(steps[i-1].doneAt.includes(status));
+        }
+        html += trackerStep(s.n, s.label, state);
+      });
+
+      return `<div class="tracker">${html}</div>`;
+    }
+
+    function openDetalhe(pedido, signedUrl) {
+      const el = document.getElementById('detalhe-content');
+      const info = statusInfo[pedido.status] || statusInfo['aguardando_prints'];
+
+      let ctaHtml = '';
+      if (pedido.status === 'aguardando_prints') {
+        ctaHtml = '<a href="/enviar" class="btn btn-primary btn-md" style="margin-top:1.5rem;">Enviar prints</a>';
+      } else if (pedido.status === 'analise_concluida' && signedUrl) {
+        ctaHtml = `<a href="${signedUrl}" target="_blank" class="btn btn-primary btn-md" style="margin-top:1.5rem;">Baixar relatório (PDF)</a>`;
+      }
+
+      let statusMsg = '';
+      if (pedido.status === 'prints_enviados') {
+        statusMsg = `
+          <div style="font-size:2.5rem;margin-bottom:1rem;">⏳</div>
+          <h2>Análise em andamento</h2>
+          <p style="color:var(--muted);margin-top:0.5rem;line-height:1.75;max-width:420px;margin-inline:auto;">
+            Sua análise está sendo preparada com cuidado. Você receberá o relatório por e-mail em até 24 horas.
+          </p>`;
+      } else if (pedido.status === 'aguardando_prints') {
+        statusMsg = `
+          <div style="font-size:2.5rem;margin-bottom:1rem;">📱</div>
+          <h2>Envie seus prints</h2>
+          <p style="color:var(--muted);margin-top:0.5rem;line-height:1.75;max-width:420px;margin-inline:auto;">
+            Envie os prints da conversa para iniciar sua análise.
+          </p>`;
+      } else if (pedido.status === 'analise_concluida') {
+        statusMsg = `
+          <div style="font-size:2.5rem;margin-bottom:1rem;">✅</div>
+          <h2>Relatório pronto!</h2>
+          <p style="color:var(--muted);margin-top:0.5rem;line-height:1.75;max-width:420px;margin-inline:auto;">
+            Seu Raio-X REAL 4D está pronto para download.
+          </p>`;
+      } else if (pedido.status === 'reembolsado') {
+        statusMsg = `
+          <div style="font-size:2.5rem;margin-bottom:1rem;">↩️</div>
+          <h2>Pedido reembolsado</h2>
+          <p style="color:var(--muted);margin-top:0.5rem;line-height:1.75;max-width:420px;margin-inline:auto;">
+            Este pedido foi reembolsado.
+          </p>`;
+      }
+
+      el.innerHTML = `
+        <div class="card" style="text-align:center;padding:2.5rem 2rem;">
+          ${buildTracker(pedido.status)}
+          <div style="margin-top:2rem;">
+            ${statusMsg}
+            ${ctaHtml}
+          </div>
+          <p style="color:var(--muted);font-size:0.82rem;margin-top:2rem;">
+            Pedido em ${formatDate(pedido.criado_em)}
+          </p>
+        </div>
+      `;
+
+      showView('view-detalhe');
+    }
 
     const statusInfo = {
       aguardando_prints: {
@@ -70,7 +176,7 @@
       },
       prints_enviados: {
         icon: '⏳',
-        desc: 'Análise em andamento. Você receberá o relatório em até 48h.',
+        desc: 'Análise em andamento. Você receberá o relatório em até 24h.',
         cta: '',
       },
       analise_concluida: {
@@ -96,8 +202,7 @@
 
       if (!pedidos || pedidos.length === 0) {
         document.getElementById('view-vazio').style.display = 'block';
-        document.getElementById('view-loading').style.display = 'none';
-        document.getElementById('view-content').style.display = 'block';
+        showView('view-content');
         return;
       }
 
@@ -135,6 +240,8 @@
 
         const card = document.createElement('div');
         card.className = 'card';
+        card.style.cursor = 'pointer';
+        card.style.transition = 'border-color 0.2s';
         card.innerHTML = `
           <div style="display:flex;align-items:flex-start;gap:1rem;">
             <div style="font-size:1.75rem;flex-shrink:0;">${info.icon}</div>
@@ -143,17 +250,22 @@
                 <span class="status-badge ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span>
                 <span style="font-size:0.82rem;color:var(--muted);">${formatDate(p.criado_em)}</span>
               </div>
-              <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;margin-bottom:${cta ? '0.75rem' : '0'};">${info.desc}</p>
-              ${cta}
+              <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;margin-bottom:0;">${info.desc}</p>
             </div>
+            <div style="flex-shrink:0;align-self:center;color:var(--muted);font-size:1.2rem;">→</div>
           </div>
         `;
+        card.addEventListener('click', () => openDetalhe(p, signedUrls[p.id] || null));
         list.appendChild(card);
       });
 
-      document.getElementById('view-loading').style.display = 'none';
-      document.getElementById('view-content').style.display = 'block';
+      showView('view-content');
     }
+
+    // Voltar
+    document.getElementById('btn-voltar').addEventListener('click', () => {
+      showView('view-content');
+    });
 
     // Auth
     async function init() {
