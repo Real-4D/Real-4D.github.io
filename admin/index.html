@@ -30,19 +30,42 @@
 
     <!-- Lista de pedidos -->
     <div id="view-lista" style="display:none;">
-      <div class="page-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
-        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-          <div>
-            <h1>Pedidos</h1>
-            <p id="total-pedidos" style="color:var(--muted);font-size:0.9rem;"></p>
+      <div class="page-title" style="margin-bottom:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div>
+              <h1>Pedidos</h1>
+              <p id="total-pedidos" style="color:var(--muted);font-size:0.9rem;"></p>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-novo-pedido">+ Novo pedido</button>
           </div>
-          <button class="btn btn-primary btn-sm" id="btn-novo-pedido">+ Novo pedido</button>
         </div>
-        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="filtros">
-          <button class="btn btn-sm btn-secondary filtro-btn active" data-status="">Todos</button>
-          <button class="btn btn-sm btn-secondary filtro-btn" data-status="aguardando_prints">Aguardando</button>
-          <button class="btn btn-sm btn-secondary filtro-btn" data-status="prints_enviados">Enviados</button>
-          <button class="btn btn-sm btn-secondary filtro-btn" data-status="analise_concluida">Concluídos</button>
+
+        <!-- Busca + datas -->
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+          <input id="busca-input" type="text" placeholder="Buscar por nome ou e-mail…"
+            class="form-input" style="flex:1;min-width:200px;padding:0.45rem 0.75rem;font-size:0.88rem;" />
+          <input id="data-inicio" type="date" class="form-input"
+            style="width:150px;padding:0.45rem 0.75rem;font-size:0.88rem;color-scheme:dark;" />
+          <input id="data-fim" type="date" class="form-input"
+            style="width:150px;padding:0.45rem 0.75rem;font-size:0.88rem;color-scheme:dark;" />
+          <button class="btn btn-sm btn-secondary" id="btn-limpar-filtros">Limpar</button>
+        </div>
+
+        <!-- Status + origem -->
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="filtros-status">
+            <button class="btn btn-sm btn-secondary filtro-status active" data-status="">Todos status</button>
+            <button class="btn btn-sm btn-secondary filtro-status" data-status="aguardando_prints">Aguardando</button>
+            <button class="btn btn-sm btn-secondary filtro-status" data-status="prints_enviados">Enviados</button>
+            <button class="btn btn-sm btn-secondary filtro-status" data-status="analise_concluida">Concluídos</button>
+          </div>
+          <div style="width:1px;height:20px;background:var(--border);margin:0 0.25rem;"></div>
+          <div style="display:flex;gap:0.5rem;" id="filtros-origem">
+            <button class="btn btn-sm btn-secondary filtro-origem active" data-origem="">Toda origem</button>
+            <button class="btn btn-sm btn-secondary filtro-origem" data-origem="hotmart">Hotmart</button>
+            <button class="btn btn-sm btn-secondary filtro-origem" data-origem="manual">Manual</button>
+          </div>
         </div>
       </div>
 
@@ -104,7 +127,11 @@
   <script src="/js/supabase-client.js"></script>
   <script>
     let todosPedidos = [];
-    let filtroAtivo  = '';
+    let filtroStatus = '';
+    let filtroOrigem = '';
+    let buscaTexto   = '';
+    let dataInicio   = '';
+    let dataFim      = '';
 
     function isManual(pedido) {
       return pedido.hotmart_transaction?.startsWith('MANUAL-');
@@ -128,9 +155,19 @@
       const vazio = document.getElementById('tabela-vazia');
       tbody.innerHTML = '';
 
-      const filtrados = filtroAtivo
-        ? pedidos.filter(p => p.status === filtroAtivo)
-        : pedidos;
+      const busca = buscaTexto.toLowerCase();
+      const filtrados = pedidos.filter(p => {
+        if (filtroStatus && p.status !== filtroStatus) return false;
+        if (filtroOrigem === 'manual' && !isManual(p)) return false;
+        if (filtroOrigem === 'hotmart' && isManual(p)) return false;
+        if (busca && !p.nome?.toLowerCase().includes(busca) && !p.email?.toLowerCase().includes(busca)) return false;
+        if (dataInicio && p.criado_em < dataInicio) return false;
+        if (dataFim && p.criado_em > dataFim + 'T23:59:59') return false;
+        return true;
+      });
+
+      document.getElementById('total-pedidos').textContent =
+        `${filtrados.length} de ${pedidos.length} pedido(s)`;
 
       if (filtrados.length === 0) {
         vazio.style.display = 'block';
@@ -153,14 +190,54 @@
       });
     }
 
-    // Filtros
-    document.querySelectorAll('.filtro-btn').forEach(btn => {
+    // Filtros — status
+    document.querySelectorAll('.filtro-status').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.filtro-status').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        filtroAtivo = btn.dataset.status;
+        filtroStatus = btn.dataset.status;
         renderTabela(todosPedidos);
       });
+    });
+
+    // Filtros — origem
+    document.querySelectorAll('.filtro-origem').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filtro-origem').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filtroOrigem = btn.dataset.origem;
+        renderTabela(todosPedidos);
+      });
+    });
+
+    // Busca por nome/email
+    document.getElementById('busca-input').addEventListener('input', e => {
+      buscaTexto = e.target.value.trim();
+      renderTabela(todosPedidos);
+    });
+
+    // Range de datas
+    document.getElementById('data-inicio').addEventListener('change', e => {
+      dataInicio = e.target.value;
+      renderTabela(todosPedidos);
+    });
+    document.getElementById('data-fim').addEventListener('change', e => {
+      dataFim = e.target.value;
+      renderTabela(todosPedidos);
+    });
+
+    // Limpar filtros
+    document.getElementById('btn-limpar-filtros').addEventListener('click', () => {
+      buscaTexto = ''; dataInicio = ''; dataFim = '';
+      filtroStatus = ''; filtroOrigem = '';
+      document.getElementById('busca-input').value = '';
+      document.getElementById('data-inicio').value = '';
+      document.getElementById('data-fim').value = '';
+      document.querySelectorAll('.filtro-status').forEach(b => b.classList.remove('active'));
+      document.querySelector('.filtro-status[data-status=""]').classList.add('active');
+      document.querySelectorAll('.filtro-origem').forEach(b => b.classList.remove('active'));
+      document.querySelector('.filtro-origem[data-origem=""]').classList.add('active');
+      renderTabela(todosPedidos);
     });
 
     // Detalhe
@@ -454,7 +531,6 @@
         const { data: pedidos } = await db.from('pedidos').select('*').order('criado_em', { ascending: false });
         if (pedidos) {
           todosPedidos = pedidos;
-          document.getElementById('total-pedidos').textContent = `${todosPedidos.length} pedido(s) no total`;
           renderTabela(todosPedidos);
         }
 
@@ -491,7 +567,6 @@
       }
 
       todosPedidos = pedidos || [];
-      document.getElementById('total-pedidos').textContent = `${todosPedidos.length} pedido(s) no total`;
       renderTabela(todosPedidos);
       show('view-lista');
     }
