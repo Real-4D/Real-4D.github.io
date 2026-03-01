@@ -190,6 +190,11 @@
     }
 
     async function loadPage(session) {
+      // Admin vai direto para o painel
+      if (session.user.email === ADMIN_EMAIL) {
+        window.location.href = '/admin'; return;
+      }
+
       currentSession = session;
       document.getElementById('nav-email').textContent = session.user.email;
 
