@@ -96,15 +96,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-client.js"></script>
   <script>
-    // Se já está logado, redireciona
-    getSession().then(session => {
-      if (!session) return;
+    function redirectLoggedIn(session) {
       window.location.href = session.user.email === ADMIN_EMAIL ? '/admin' : '/enviar';
-    });
+    }
 
+    // Única fonte de verdade para auth
     db.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        window.location.href = session.user.email === ADMIN_EMAIL ? '/admin' : '/enviar';
+      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
+        redirectLoggedIn(session);
       }
     });
 
@@ -146,7 +145,7 @@
       btnSubmit.disabled = true;
       btnSubmit.innerHTML = '<span class="spinner"></span>';
 
-      const { error } = await db.auth.signInWithPassword({ email, password: senha });
+      const { data, error } = await db.auth.signInWithPassword({ email, password: senha });
 
       if (error) {
         registerFailure(errEl);
@@ -155,8 +154,10 @@
         }
         btnSubmit.disabled = false;
         btnSubmit.textContent = 'ENTRAR';
+      } else {
+        // Redirect direto — sessão já está persistida quando a promise resolve
+        redirectLoggedIn(data.session);
       }
-      // Sucesso: onAuthStateChange redireciona
     });
 
     // ── Alternar entre password e magic link ───────────────────

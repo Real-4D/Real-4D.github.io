@@ -191,17 +191,20 @@
       document.getElementById('view-content').style.display  = 'block';
     }
 
-    db.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-        await loadPage(session);
-      }
-    });
+    // Auth — fonte única: onAuthStateChange
+    let pageLoaded = false;
 
-    getSession().then(async session => {
-      if (session) await loadPage(session);
-      else setTimeout(() => {
-        getSession().then(s => { if (!s) window.location.href = '/entrar'; });
-      }, 2000);
+    db.auth.onAuthStateChange(async (event, session) => {
+      if (pageLoaded) return;
+
+      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
+        pageLoaded = true;
+        await loadPage(session);
+      } else if (event === 'INITIAL_SESSION' && !session) {
+        if (!window.location.hash.includes('access_token')) {
+          window.location.href = '/entrar';
+        }
+      }
     });
 
     document.getElementById('btn-logout').addEventListener('click', async () => {

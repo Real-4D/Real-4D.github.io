@@ -221,24 +221,20 @@
       show('view-form');
     }
 
-    // Auth
-    db.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-        await loadPage(session);
-      } else if (event === 'SIGNED_OUT') {
-        window.location.href = '/';
-      }
-    });
+    // Auth — fonte única: onAuthStateChange
+    let pageLoaded = false;
 
-    getSession().then(async session => {
-      if (session) await loadPage(session);
-      else {
-        // Aguarda o onAuthStateChange capturar o magic link
-        setTimeout(() => {
-          getSession().then(s => {
-            if (!s) window.location.href = '/entrar';
-          });
-        }, 3000);
+    db.auth.onAuthStateChange(async (event, session) => {
+      if (pageLoaded) return;
+
+      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
+        pageLoaded = true;
+        await loadPage(session);
+      } else if (event === 'INITIAL_SESSION' && !session) {
+        // Sem sessão. Se tem magic link na URL, SIGNED_IN vai disparar em seguida.
+        if (!window.location.hash.includes('access_token')) {
+          window.location.href = '/entrar';
+        }
       }
     });
 
