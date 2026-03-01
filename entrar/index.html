@@ -121,11 +121,14 @@
 
       const { error } = await db.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `https://real4d.me${next}` }
+        options: { emailRedirectTo: `https://real4d.me${next}`, shouldCreateUser: false }
       });
 
       if (error) {
-        errEl.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+        const msg = error.message.includes('Signups not allowed')
+          ? 'E-mail não cadastrado. Verifique se digitou o mesmo e-mail da compra.'
+          : error.message;
+        errEl.innerHTML = `<div class="alert alert-error">${msg}</div>`;
         btn.disabled = false;
         btn.textContent = 'ENVIAR LINK DE ACESSO';
       } else {
@@ -172,7 +175,7 @@
 
       const { error } = await db.auth.signInWithOtp({
         email: lastEmail,
-        options: { emailRedirectTo: `https://real4d.me${next}` }
+        options: { emailRedirectTo: `https://real4d.me${next}`, shouldCreateUser: false }
       });
 
       if (error) {
