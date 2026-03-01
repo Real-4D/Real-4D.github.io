@@ -130,6 +130,20 @@
           <div id="preview-grid" class="preview-grid"></div>
         </div>
 
+        <!-- LGPD: Consentimento -->
+        <div class="card" style="padding:1.25rem 1.5rem;">
+          <label style="display:flex;gap:0.75rem;cursor:pointer;align-items:flex-start;">
+            <input type="checkbox" id="check-lgpd" style="margin-top:0.3rem;flex-shrink:0;width:18px;height:18px;accent-color:var(--primary);cursor:pointer;" />
+            <span style="font-size:0.84rem;color:var(--muted);line-height:1.7;">
+              Declaro que li e concordo com a
+              <a href="/privacidade" target="_blank" style="color:var(--primary);text-decoration:underline;">Política de Privacidade</a>
+              e os Termos de Uso do REAL 4D.
+              Confirmo que estou enviando voluntariamente as mensagens para análise, que possuo legitimidade para compartilhar esse conteúdo e que estou ciente de que os dados — incluindo conteúdo de natureza íntima e romântica — serão tratados exclusivamente para elaboração do relatório solicitado, nos termos da LGPD (Lei nº 13.709/18).
+              Estou ciente de que devo, sempre que possível, ocultar nomes, fotos de perfil e dados que identifiquem terceiros antes do envio.
+            </span>
+          </label>
+        </div>
+
         <div id="submit-msg"></div>
 
         <div id="progress-wrap" class="progress-wrap" style="display:none;">
@@ -262,12 +276,16 @@
     const uploadCount  = document.getElementById('upload-count');
     const btnSubmit    = document.getElementById('btn-submit');
 
+    const checkLgpd = document.getElementById('check-lgpd');
+
     function updateUI() {
       uploadCount.style.display = selectedFiles.length > 0 ? 'block' : 'none';
       uploadCount.textContent   = `${selectedFiles.length} de ${MAX_FILES} imagens selecionadas`;
-      btnSubmit.disabled        = selectedFiles.length === 0;
+      btnSubmit.disabled        = selectedFiles.length === 0 || !checkLgpd.checked;
       renderPreviews();
     }
+
+    checkLgpd.addEventListener('change', updateUI);
 
     function renderPreviews() {
       previewGrid.innerHTML = '';
