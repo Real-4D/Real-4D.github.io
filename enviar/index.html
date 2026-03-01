@@ -198,27 +198,27 @@
       currentSession = session;
       document.getElementById('nav-email').textContent = session.user.email;
 
-      const { data: pedido, error } = await db
+      const { data: pedidos } = await db
         .from('pedidos')
         .select('*')
         .eq('email', session.user.email)
-        .order('criado_em', { ascending: false })
-        .limit(1)
-        .single();
+        .order('criado_em', { ascending: false });
 
-      if (error || !pedido) { show('view-nopedido'); return; }
-
-      currentPedido = pedido;
-
-      if (pedido.status === 'analise_concluida') {
+      if (!pedidos || pedidos.length === 0) {
         window.location.href = '/minha-analise'; return;
       }
 
-      if (pedido.status === 'prints_enviados') {
-        show('view-aguardando'); return;
-      }
+      const pendente = pedidos.find(p => p.status === 'aguardando_prints');
+      const enviado  = pedidos.find(p => p.status === 'prints_enviados');
 
-      show('view-form');
+      if (pendente) {
+        currentPedido = pendente;
+        show('view-form');
+      } else if (enviado) {
+        show('view-aguardando');
+      } else {
+        window.location.href = '/minha-analise';
+      }
     }
 
     // Auth — mesmo padrão do admin: getSession() direto

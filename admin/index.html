@@ -212,6 +212,7 @@
             <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
               <span class="status-badge ${STATUS_CLASS[pedido.status]}">${STATUS_LABEL[pedido.status]}</span>
               ${origemBadge(pedido)}
+              ${pedido.status === 'aguardando_prints' ? `<button class="btn btn-sm btn-secondary" id="btn-reenviar-link" data-email="${pedido.email}">Reenviar link</button>` : ''}
             </div>
           </div>
           <div style="font-size:0.82rem;color:var(--muted);">
@@ -274,6 +275,27 @@
       const pdfInput    = document.getElementById('pdf-input');
       const btnUpload   = document.getElementById('btn-upload-pdf');
       const msgUpload   = document.getElementById('upload-pdf-msg');
+
+      // Reenviar link
+      const btnReenviar = document.getElementById('btn-reenviar-link');
+      if (btnReenviar) {
+        btnReenviar.addEventListener('click', async () => {
+          const emailCliente = btnReenviar.dataset.email;
+          btnReenviar.disabled = true;
+          btnReenviar.textContent = 'Enviando...';
+          const { error } = await db.auth.signInWithOtp({
+            email: emailCliente,
+            options: { emailRedirectTo: 'https://real4d.me/minha-analise' }
+          });
+          if (error) {
+            btnReenviar.textContent = 'Erro!';
+            setTimeout(() => { btnReenviar.textContent = 'Reenviar link'; btnReenviar.disabled = false; }, 2000);
+          } else {
+            btnReenviar.textContent = 'Enviado!';
+            setTimeout(() => { btnReenviar.textContent = 'Reenviar link'; btnReenviar.disabled = false; }, 3000);
+          }
+        });
+      }
 
       if (pdfInput) {
         pdfInput.addEventListener('change', () => {
@@ -378,7 +400,7 @@
 
         if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
 
-        msgEl.innerHTML = '<div class="alert alert-success">Pedido criado! Magic link enviado.</div>';
+        msgEl.innerHTML = '<div class="alert alert-success">Pedido criado! Magic link enviado ao cliente.</div>';
 
         // Recarrega lista
         const { data: pedidos } = await db.from('pedidos').select('*').order('criado_em', { ascending: false });

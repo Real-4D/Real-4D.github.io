@@ -75,12 +75,12 @@ Deno.serve(async (req) => {
       return new Response("Erro ao criar pedido", { status: 500, headers: corsHeaders });
     }
 
-    // Envia magic link para o cliente acessar a página de upload
-    await supabase.auth.admin.generateLink({
-      type: "magiclink",
+    // Envia magic link por email (signInWithOtp envia de fato, generateLink não)
+    const { error: otpErr } = await supabase.auth.signInWithOtp({
       email,
-      options: { redirectTo: "https://real4d.me/enviar" },
+      options: { emailRedirectTo: "https://real4d.me/minha-analise" },
     });
+    if (otpErr) console.error("Erro ao enviar magic link:", otpErr);
 
     console.log(`Pedido criado: ${email} — ${transacao}`);
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });

@@ -84,7 +84,7 @@
     function redirectLoggedIn(session) {
       if (redirected) return;
       redirected = true;
-      window.location.href = session.user.email === ADMIN_EMAIL ? '/admin' : '/enviar';
+      window.location.href = session.user.email === ADMIN_EMAIL ? '/admin' : '/minha-analise';
     }
 
     // Se já está logado, redireciona
@@ -97,7 +97,7 @@
     const btn     = document.getElementById('btn-submit');
     const errEl   = document.getElementById('error-msg');
     const params  = new URLSearchParams(window.location.search);
-    const next    = params.get('next') === 'admin' ? '/admin' : '/enviar';
+    const next    = params.get('next') === 'admin' ? '/admin' : '/minha-analise';
 
     let lastEmail = '';
 
