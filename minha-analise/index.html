@@ -133,11 +133,32 @@
 
       let statusMsg = '';
       if (pedido.status === 'prints_enviados') {
+        // Calcula tempo restante baseado na hora real do envio
+        let tempoMsg = '';
+        if (printsDate) {
+          const enviado = new Date(printsDate).getTime();
+          const agora = Date.now();
+          const limite = enviado + 24 * 60 * 60 * 1000;
+          const restanteMs = limite - agora;
+          if (restanteMs <= 0) {
+            tempoMsg = 'Seu relatório está quase pronto — estamos finalizando a análise.';
+          } else {
+            const horas = Math.floor(restanteMs / (60 * 60 * 1000));
+            const minutos = Math.floor((restanteMs % (60 * 60 * 1000)) / (60 * 1000));
+            if (horas > 0) {
+              tempoMsg = `Previsão de entrega em até <strong style="color:var(--text);">${horas}h${minutos > 0 ? `${String(minutos).padStart(2,'0')}min` : ''}</strong>.`;
+            } else {
+              tempoMsg = `Previsão de entrega em até <strong style="color:var(--text);">${minutos} minutos</strong>.`;
+            }
+          }
+        } else {
+          tempoMsg = 'Você receberá o relatório por e-mail em até 24 horas.';
+        }
         statusMsg = `
           <div style="font-size:2.5rem;margin-bottom:1rem;">⏳</div>
           <h2>Análise em andamento</h2>
           <p style="color:var(--muted);margin-top:0.5rem;line-height:1.75;max-width:420px;margin-inline:auto;">
-            Sua análise está sendo preparada com cuidado. Você receberá o relatório por e-mail em até <strong style="color:var(--text);">24 horas após o envio dos prints</strong>.
+            Sua análise está sendo preparada com cuidado. ${tempoMsg}
           </p>`;
       } else if (pedido.status === 'aguardando_prints') {
         statusMsg = `
