@@ -42,7 +42,7 @@
       <div class="page-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
         <h1>Minhas análises</h1>
         <a href="https://pay.hotmart.com/W104658249V" target="_blank" rel="noopener"
-           class="btn btn-primary btn-sm">Nova análise</a>
+           class="btn btn-primary btn-sm" data-cta="dashboard_nova">Nova análise</a>
       </div>
 
       <!-- Lista de pedidos -->
@@ -57,7 +57,7 @@
             Você ainda não tem nenhum pedido. Faça sua primeira análise e descubra o que a conversa revela.
           </p>
           <a href="https://pay.hotmart.com/W104658249V" target="_blank" rel="noopener"
-             class="btn btn-primary btn-lg">QUERO MINHA ANÁLISE</a>
+             class="btn btn-primary btn-lg" data-cta="dashboard_vazio">QUERO MINHA ANÁLISE</a>
         </div>
       </div>
 
@@ -373,6 +373,17 @@
     document.getElementById('btn-logout').addEventListener('click', async () => {
       await db.auth.signOut();
       window.location.href = '/';
+    });
+
+    // GA4: rastreia cliques nos CTAs de checkout
+    document.querySelectorAll('[data-cta]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        gtag('event', 'click_checkout', {
+          event_category: 'cta',
+          event_label: el.dataset.cta,
+          button_text: el.textContent.trim()
+        });
+      });
     });
   </script>
 </body>
