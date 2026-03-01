@@ -164,9 +164,10 @@ h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
 
 .btn-secondary:hover { background: rgba(255,255,255,0.1); }
 .btn-secondary.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  opacity: 1 !important;
 }
 
 .btn-danger {
