@@ -71,6 +71,47 @@
       <div id="detalhe-content"></div>
     </div>
 
+    <!-- LGPD: Excluir conta -->
+    <div id="view-lgpd" style="display:none;">
+      <div style="margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h3 style="font-size:0.88rem;color:var(--muted);margin-bottom:0.25rem;">Seus dados</h3>
+            <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;">
+              Conforme a LGPD, você pode solicitar a exclusão de todos os seus dados.
+            </p>
+          </div>
+          <button class="btn btn-danger btn-sm" id="btn-excluir-conta">Excluir minha conta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de confirmação -->
+    <div id="modal-excluir" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;">
+      <div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:var(--radius);max-width:480px;width:100%;padding:2rem;">
+        <h2 style="font-size:1.2rem;margin-bottom:0.75rem;color:#f87171;">Excluir conta e dados</h2>
+        <p style="font-size:0.9rem;color:var(--muted);line-height:1.7;margin-bottom:1rem;">
+          Esta ação é <strong style="color:var(--text);">irreversível</strong>. Todos os seus dados serão permanentemente excluídos:
+        </p>
+        <ul style="font-size:0.85rem;color:var(--muted);line-height:1.8;margin-bottom:1.25rem;padding-left:1.25rem;">
+          <li>Prints de conversas enviados</li>
+          <li>Respostas do questionário</li>
+          <li>Relatórios gerados (PDFs)</li>
+          <li>Dados de pedidos</li>
+          <li>Sua conta de acesso</li>
+        </ul>
+        <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin-bottom:1.25rem;">
+          Em conformidade com a <strong style="color:var(--text);">Lei Geral de Proteção de Dados (LGPD)</strong>, ao confirmar, seus dados serão removidos e você receberá um e-mail de confirmação.
+        </p>
+        <div style="display:flex;gap:0.75rem;justify-content:flex-end;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" id="btn-cancelar-excluir">Cancelar</button>
+          <button class="btn btn-danger btn-sm" id="btn-confirmar-excluir" style="background:rgba(239,68,68,0.9);color:#fff;border:none;">
+            Confirmar exclusão
+          </button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -82,6 +123,8 @@
       ['view-loading','view-content','view-detalhe'].forEach(v => {
         document.getElementById(v).style.display = 'none';
       });
+      // LGPD section acompanha view-content
+      document.getElementById('view-lgpd').style.display = (id === 'view-content') ? 'block' : 'none';
       document.getElementById(id).style.display = 'block';
     }
 
@@ -336,6 +379,7 @@
         list.appendChild(card);
       });
 
+      document.getElementById('view-lgpd').style.display = 'block';
       showView('view-content');
     }
 
@@ -373,6 +417,48 @@
     document.getElementById('btn-logout').addEventListener('click', async () => {
       await db.auth.signOut();
       window.location.href = '/';
+    });
+
+    // ── LGPD: Excluir conta ────────────────────────────────────
+    const modalExcluir = document.getElementById('modal-excluir');
+
+    document.getElementById('btn-excluir-conta').addEventListener('click', () => {
+      modalExcluir.style.display = 'flex';
+    });
+
+    document.getElementById('btn-cancelar-excluir').addEventListener('click', () => {
+      modalExcluir.style.display = 'none';
+    });
+
+    modalExcluir.addEventListener('click', (e) => {
+      if (e.target === modalExcluir) modalExcluir.style.display = 'none';
+    });
+
+    document.getElementById('btn-confirmar-excluir').addEventListener('click', async () => {
+      const btnConfirm = document.getElementById('btn-confirmar-excluir');
+      btnConfirm.disabled = true;
+      btnConfirm.innerHTML = '<span class="spinner"></span> Excluindo...';
+
+      try {
+        const session = await getSession();
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error('Falha na exclusão');
+
+        await db.auth.signOut();
+        window.location.href = '/entrar';
+      } catch (err) {
+        console.error(err);
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = 'Confirmar exclusão';
+        alert('Erro ao excluir conta. Tente novamente.');
+      }
     });
 
     // GA4: rastreia cliques nos CTAs de checkout
