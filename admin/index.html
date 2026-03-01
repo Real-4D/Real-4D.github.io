@@ -78,6 +78,7 @@
   <script>
     let todosPedidos = [];
     let filtroAtivo  = '';
+    let adminLoaded  = false;
 
     function show(id) {
       ['view-loading','view-lista','view-detalhe'].forEach(v => {
@@ -328,16 +329,25 @@
     });
 
     // Load
-    async function loadAdmin() {
-      const session = await requireAdmin();
-      if (!session) return;
+    async function loadAdmin(session) {
+      if (adminLoaded) return;
+      adminLoaded = true;
+
+      if (!session || session.user.email !== ADMIN_EMAIL) {
+        window.location.href = session ? '/' : '/entrar?next=admin';
+        return;
+      }
 
       const { data: pedidos, error } = await db
         .from('pedidos')
         .select('*')
         .order('criado_em', { ascending: false });
 
-      if (error) { console.error(error); return; }
+      if (error) {
+        document.getElementById('view-loading').innerHTML =
+          `<div style="color:#f87171;font-size:.9rem;">Erro ao carregar pedidos: ${error.message}</div>`;
+        return;
+      }
 
       todosPedidos = pedidos || [];
       document.getElementById('total-pedidos').textContent = `${todosPedidos.length} pedido(s) no total`;
@@ -346,21 +356,20 @@
     }
 
     db.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-        if (session.user.email !== ADMIN_EMAIL) {
-          window.location.href = '/'; return;
-        }
-        await loadAdmin();
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        await loadAdmin(session);
+      } else if (event === 'SIGNED_OUT') {
+        window.location.href = '/entrar?next=admin';
       }
     });
 
     getSession().then(async session => {
       if (session) {
-        if (session.user.email !== ADMIN_EMAIL) { window.location.href = '/'; return; }
-        await loadAdmin();
+        await loadAdmin(session);
       } else {
-        setTimeout(() => {
-          getSession().then(s => { if (!s) window.location.href = '/entrar?next=admin'; });
+        setTimeout(async () => {
+          const s = await getSession();
+          if (!s) window.location.href = '/entrar?next=admin';
         }, 2000);
       }
     });
