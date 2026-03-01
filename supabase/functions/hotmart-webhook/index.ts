@@ -5,23 +5,33 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }
 
   let body: any;
   try {
     body = await req.json();
   } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    return new Response("Invalid JSON", { status: 400, headers: corsHeaders });
   }
 
   const evento    = body?.event;
   const dados     = body?.data;
 
   if (!evento || !dados) {
-    return new Response("Payload inválido", { status: 400 });
+    return new Response("Payload inválido", { status: 400, headers: corsHeaders });
   }
 
   const email     = dados?.buyer?.email?.toLowerCase();
@@ -29,7 +39,7 @@ Deno.serve(async (req) => {
   const transacao = dados?.purchase?.transaction;
 
   if (!email || !transacao) {
-    return new Response("Dados insuficientes", { status: 400 });
+    return new Response("Dados insuficientes", { status: 400, headers: corsHeaders });
   }
 
   // ── Pagamento aprovado ────────────────────────────────────
@@ -48,7 +58,7 @@ Deno.serve(async (req) => {
 
       if (errUsuario) {
         console.error("Erro ao criar usuário:", errUsuario);
-        return new Response("Erro ao criar usuário", { status: 500 });
+        return new Response("Erro ao criar usuário", { status: 500, headers: corsHeaders });
       }
     }
 
@@ -62,7 +72,7 @@ Deno.serve(async (req) => {
 
     if (errPedido && !errPedido.message.includes("duplicate")) {
       console.error("Erro ao criar pedido:", errPedido);
-      return new Response("Erro ao criar pedido", { status: 500 });
+      return new Response("Erro ao criar pedido", { status: 500, headers: corsHeaders });
     }
 
     // Envia magic link para o cliente acessar a página de upload
@@ -73,7 +83,7 @@ Deno.serve(async (req) => {
     });
 
     console.log(`Pedido criado: ${email} — ${transacao}`);
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
   }
 
   // ── Reembolso / chargeback ────────────────────────────────
@@ -84,8 +94,8 @@ Deno.serve(async (req) => {
       .eq("hotmart_transaction", transacao);
 
     console.log(`Pedido reembolsado: ${transacao}`);
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
   }
 
-  return new Response(JSON.stringify({ ignorado: evento }), { status: 200 });
+  return new Response(JSON.stringify({ ignorado: evento }), { status: 200, headers: corsHeaders });
 });
