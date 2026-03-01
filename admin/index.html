@@ -141,7 +141,7 @@
       filtrados.forEach(p => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><strong>${p.nome || '—'}</strong></td>
+          <td><strong>${p.nome || '—'}</strong><br><span style="font-size:0.7rem;color:var(--muted);font-family:monospace;">#${p.id.substring(0, 8)}</span></td>
           <td style="color:var(--muted)">${p.email}</td>
           <td><span class="status-badge ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span></td>
           <td>${origemBadge(p)}</td>
@@ -202,11 +202,32 @@
         }
       }
 
+      // Datas para timeline
+      const printsDate = prints && prints.length > 0 ? prints[0].criado_em : null;
+      const relatorioDate = relatorio?.criado_em || null;
+
+      const timelineEvents = [
+        { label: 'Pedido criado', date: pedido.criado_em, done: true },
+        { label: 'Prints enviados', date: printsDate, done: !!printsDate },
+        { label: 'Relatório entregue', date: relatorioDate, done: !!relatorioDate },
+      ];
+
+      const timelineHtml = timelineEvents.map(ev => `
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.4rem 0;">
+          <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${ev.done ? '#34d399' : 'rgba(255,255,255,0.1)'};"></div>
+          <span style="flex:1;font-size:0.85rem;color:${ev.done ? 'var(--text)' : 'var(--muted)'};">${ev.label}</span>
+          <span style="font-size:0.78rem;color:var(--muted);white-space:nowrap;">${ev.done && ev.date ? formatDate(ev.date) : '—'}</span>
+        </div>
+      `).join('');
+
       el.innerHTML = `
         <!-- Header -->
         <div class="card" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
           <div>
-            <h2>${pedido.nome || 'Cliente'}</h2>
+            <div style="display:flex;align-items:baseline;gap:0.75rem;">
+              <h2>${pedido.nome || 'Cliente'}</h2>
+              <span style="font-size:0.75rem;color:var(--muted);font-family:monospace;">#${pedido.id.substring(0, 8)}</span>
+            </div>
             <p style="color:var(--muted);font-size:0.9rem;">${pedido.email}</p>
             <p style="color:var(--muted);font-size:0.82rem;margin-top:0.25rem;">Transação: ${pedido.hotmart_transaction}</p>
             <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
@@ -217,6 +238,14 @@
           </div>
           <div style="font-size:0.82rem;color:var(--muted);">
             ${formatDate(pedido.criado_em)}
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="card" style="padding:1.25rem 1.5rem;">
+          <h3 style="font-size:0.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">Histórico</h3>
+          <div style="border-left:2px solid rgba(255,255,255,0.07);margin-left:3px;padding-left:0;">
+            ${timelineHtml}
           </div>
         </div>
 
