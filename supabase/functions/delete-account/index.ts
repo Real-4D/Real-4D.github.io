@@ -28,7 +28,7 @@ function emailExclusao(nome: string): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
           <tr>
             <td align="center" style="padding-bottom:32px;">
-              <img src="https://real4d.me/assets/logo-without-name-back-black.png"
+              <img src="https://real4d.me/assets/logo.png"
                    alt="REAL 4D" width="56" height="56"
                    style="display:block;border-radius:12px;" />
             </td>
