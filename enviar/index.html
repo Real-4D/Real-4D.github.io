@@ -83,32 +83,36 @@
           <div class="divider"></div>
 
           <div class="form-group">
-            <label class="form-label" for="fase">Em que fase está a interação?</label>
-            <select class="form-select" id="fase" name="fase" required>
+            <label class="form-label" for="tempo">Há quanto tempo vocês interagem?</label>
+            <select class="form-select" id="tempo" name="tempo" required>
               <option value="">Selecione...</option>
               <option>Menos de 1 mês</option>
-              <option>1 a 3 meses</option>
-              <option>3 a 12 meses</option>
-              <option>Mais de 12 meses</option>
+              <option>1–3 meses</option>
+              <option>3–12 meses</option>
+              <option>Mais de 1 ano</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="preocupacao">Qual é sua principal preocupação?</label>
-            <select class="form-select" id="preocupacao" name="preocupacao" required>
+            <label class="form-label" for="fase">Qual é a fase atual?</label>
+            <select class="form-select" id="fase" name="fase" required>
               <option value="">Selecione...</option>
-              <option>Saber se ele tem interesse real</option>
-              <option>Entender por que ele some e aparece</option>
-              <option>Descobrir se ele quer exclusividade</option>
-              <option>Entender se a relação vai evoluir</option>
-              <option>Outro</option>
+              <option>Apenas conversa / conhecendo</option>
+              <option>Já saíram algumas vezes</option>
+              <option>Envolvimento frequente</option>
+              <option>Relação já estabelecida</option>
             </select>
           </div>
 
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label" for="contexto">Contexto adicional (opcional)</label>
-            <textarea class="form-textarea" id="contexto" name="contexto"
-              placeholder="Algo importante que eu deva saber sobre a situação atual..."></textarea>
+            <label class="form-label" for="preocupacao">O que mais te preocupa hoje?</label>
+            <select class="form-select" id="preocupacao" name="preocupacao" required>
+              <option value="">Selecione...</option>
+              <option>Ele perder o interesse</option>
+              <option>Ele não querer algo sério</option>
+              <option>Eu estar mais envolvida</option>
+              <option>Nada específico</option>
+            </select>
           </div>
         </div>
 
@@ -333,15 +337,15 @@
       e.preventDefault();
       if (!currentPedido || selectedFiles.length === 0) return;
 
+      const tempo      = document.getElementById('tempo').value;
       const fase       = document.getElementById('fase').value;
       const preocupacao= document.getElementById('preocupacao').value;
-      const contexto   = document.getElementById('contexto').value;
       const msgEl      = document.getElementById('submit-msg');
       const progressWrap = document.getElementById('progress-wrap');
       const progressBar  = document.getElementById('progress-bar');
 
-      if (!fase || !preocupacao) {
-        msgEl.innerHTML = '<div class="alert alert-warn">Responda as duas primeiras perguntas antes de enviar.</div>';
+      if (!tempo || !fase || !preocupacao) {
+        msgEl.innerHTML = '<div class="alert alert-warn">Responda as três perguntas antes de enviar.</div>';
         return;
       }
 
@@ -381,7 +385,7 @@
           pedido_id: pedidoId,
           fase_relacionamento: fase,
           preocupacao_principal: preocupacao,
-          contexto_adicional: contexto || null,
+          contexto_adicional: tempo,
         });
         if (errResp) throw errResp;
 
