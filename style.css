@@ -218,14 +218,31 @@ h3 { font-size: 1.4rem; font-weight: 700; }
   justify-content: center;
 }
 
-.hero-logo {
-  width: 340px;
-  height: 340px;
+.hero-logo-composed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.hero-logo-icon {
+  width: 220px;
+  height: 220px;
   border-radius: 32px;
-  box-shadow:
-    0 40px 80px rgba(0,0,0,0.6),
-    0 0 0 1px var(--border),
-    0 0 80px rgba(212,24,107,0.12);
+  filter: drop-shadow(0 40px 60px rgba(0,0,0,0.5)) drop-shadow(0 0 60px rgba(212,24,107,0.15));
+}
+
+.hero-logo-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #eeeef4;
+}
+
+.hero-logo-text strong {
+  color: var(--primary);
+  font-weight: 800;
 }
 
 /* ─── Identificação ─────────────────────────────────── */
@@ -770,7 +787,8 @@ details[open] .faq-q::after { transform: rotate(45deg); }
   .microcopy  { justify-content: center; }
 
   .hero-logo-wrap { order: -1; }
-  .hero-logo      { width: 220px; height: 220px; }
+  .hero-logo-icon { width: 150px; height: 150px; border-radius: 24px; }
+  .hero-logo-text { font-size: 2rem; }
 
   .proof-grid { grid-template-columns: 1fr; }
   .real-grid  { grid-template-columns: 1fr; }
