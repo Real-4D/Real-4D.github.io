@@ -127,7 +127,7 @@
             <input type="file" id="file-input" accept="image/*" multiple />
             <div class="upload-icon">📱</div>
             <p class="upload-text"><strong>Clique para selecionar</strong> ou arraste os prints aqui</p>
-            <p class="upload-text">Até 10 imagens · PNG, JPG, WEBP</p>
+            <p class="upload-text">Até 10 imagens · PNG, JPG, WEBP · Máx. 10 MB cada</p>
           </div>
 
           <div id="upload-count" class="upload-count" style="display:none;"></div>
@@ -206,7 +206,9 @@
     let currentPedido  = null;
     let selectedFiles  = [];
 
-    const MAX_FILES = 10;
+    const MAX_FILES    = 10;
+    const MAX_FILE_MB  = 10;
+    const MAX_TOTAL_MB = 50;
 
     function show(id) {
       ['view-loading','view-nopedido','view-form','view-aguardando'].forEach(v => {
@@ -316,9 +318,38 @@
     }
 
     function handleFiles(files) {
+      const msgEl = document.getElementById('submit-msg');
       const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
       const remaining = MAX_FILES - selectedFiles.length;
-      selectedFiles = [...selectedFiles, ...arr.slice(0, remaining)];
+      const candidates = arr.slice(0, remaining);
+
+      const rejected = [];
+      const accepted = [];
+
+      for (const f of candidates) {
+        if (f.size > MAX_FILE_MB * 1024 * 1024) {
+          rejected.push(f.name);
+        } else {
+          accepted.push(f);
+        }
+      }
+
+      // Verifica total
+      const currentTotal = selectedFiles.reduce((s, f) => s + f.size, 0);
+      const newTotal = accepted.reduce((s, f) => s + f.size, 0);
+
+      if ((currentTotal + newTotal) > MAX_TOTAL_MB * 1024 * 1024) {
+        msgEl.innerHTML = `<div class="alert alert-warn">O total das imagens ultrapassa ${MAX_TOTAL_MB} MB. Remova algumas e tente novamente.</div>`;
+        return;
+      }
+
+      if (rejected.length > 0) {
+        msgEl.innerHTML = `<div class="alert alert-warn">Imagens removidas por exceder ${MAX_FILE_MB} MB: ${rejected.join(', ')}</div>`;
+      } else {
+        msgEl.innerHTML = '';
+      }
+
+      selectedFiles = [...selectedFiles, ...accepted];
       updateUI();
     }
 
